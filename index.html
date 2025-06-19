@@ -1048,13 +1048,13 @@
                             ionizationDetails.length > 0 && React.createElement('button', {
                                 key: 'clear-all-btn',
                                 style: {
-                                    padding: "6px 12px",
+                                    padding: "6px",
                                     backgroundColor: "#e74c3c",
                                     color: "white",
                                     border: "none",
                                     borderRadius: "4px",
                                     cursor: "pointer",
-                                    marginBottom: "16px",
+                                    marginBottom: "4px",
                                     fontSize: "12px",
                                 },
                                 onClick: () => setIonizationDetails([])
@@ -1065,12 +1065,12 @@
                                     display: "flex",
                                     gap: "32px",
                                     alignItems: "left",
-                                    height: "300px",
+                                    height: "500px",
                                     justifyContent: "left",
                                     margin: "0 auto",
                                     width: "fit-content",
                                     flexWrap: "wrap",
-                                    maxWidth: "900px",
+                                    maxWidth: "800px",
                                 }
                             }, ionizationDetails.slice(-8).map((detail, idx) => {
                                 const ionizationEnergy = detail.energy;
