@@ -1041,15 +1041,15 @@
                                 flexDirection: "column",
                                 alignItems: "center",
                                 width: "100%",
-                                marginTop: "60px",
+                                marginTop: "30px",
                             }
                         }, [
-                            // Clear All button
-                            ionizationDetails.length > 0 && React.createElement('button', {
-                                key: 'clear-all-btn',
+                            // Reset Current Element button (moved here)
+                            React.createElement('button', {
+                                key: 'reset-element-btn',
                                 style: {
-                                    padding: "6px 12px",
-                                    backgroundColor: "#e74c3c",
+                                    padding: "8px 16px",
+                                    backgroundColor: "#3498db",
                                     color: "white",
                                     border: "none",
                                     borderRadius: "4px",
@@ -1057,8 +1057,8 @@
                                     marginBottom: "16px",
                                     fontSize: "12px",
                                 },
-                                onClick: () => setIonizationDetails([])
-                            }, 'Clear All Comparisons'),
+                                onClick: resetSimulation
+                            }, 'Reset Current Element'),
 
                             React.createElement('div', {
                                 style: {
@@ -1163,17 +1163,17 @@
                             marginTop: "20px",
                         }
                     }, 
-                        React.createElement('button', {
+                        ionizationDetails.length > 0 && React.createElement('button', {
                             style: {
                                 padding: "8px 16px",
-                                backgroundColor: "#3498db",
+                                backgroundColor: "#e74c3c",
                                 color: "white",
                                 border: "none",
                                 borderRadius: "4px",
                                 cursor: "pointer",
                             },
-                            onClick: resetSimulation
-                        }, 'Reset Current Element')
+                            onClick: () => setIonizationDetails([])
+                        }, 'Clear All Comparisons')
                     )
                 ]),
 
