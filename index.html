@@ -672,7 +672,7 @@
                 // Draw nucleus
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, nucleusRadius, 0, 2 * Math.PI);
-                ctx.fillStyle = elements[selectedElement].color;
+                ctx.fillStyle = "#000000"; // Black nucleus for all elements
                 ctx.fill();
 
                 // Draw element symbol in nucleus
@@ -1063,14 +1063,14 @@
                             React.createElement('div', {
                                 style: {
                                     display: "flex",
-                                    gap: "20px",
+                                    gap: "32px",
                                     alignItems: "left",
                                     height: "256px",
                                     justifyContent: "left",
                                     margin: "0 auto",
                                     width: "fit-content",
                                     flexWrap: "wrap",
-                                    maxWidth: "800px",
+                                    maxWidth: "900px",
                                 }
                             }, ionizationDetails.slice(-8).map((detail, idx) => {
                                 const ionizationEnergy = detail.energy;
