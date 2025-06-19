@@ -208,7 +208,7 @@
                         1520, 2666, 3931, 5771, 7238, 8781, 11995, 13842, 40760, 46190, 52500, 59400, 71700, 75000, 88600, 103400, 111700, 386200,
                     ],
                 },
-                  S: {
+                S: {
                     name: "Sulfur",
                     atomicNumber: 16,
                     color: "#FFFF30", // Bright yellow
@@ -220,36 +220,6 @@
                     },
                     sequentialIonizationEnergies: [
                         1000, 2252, 3357, 4556, 7004, 8495, 27107, 31669, 72594, 88049, 108100, 128558, 164934, 200000, 230766, 284766,
-                    ],
-                },
-                K: {
-                    name: "Potassium",
-                    atomicNumber: 19,
-                    color: "#8F40D4", // Purple
-                    shellConfiguration: [2, 8, 8, 1],
-                    shellIonizationEnergies: {
-                        0: [354600, 387600], // Inner shell (1s)
-                        1: [37700, 44900, 53500, 62300, 72100, 82700, 96300, 106800], // Second shell (2s, 2p)
-                        2: [4610, 6300, 8400, 11200, 14700, 18800, 23300, 27700], // Third shell (3s, 3p)
-                        3: [419], // Outer shell (4s)
-                    },
-                    sequentialIonizationEnergies: [
-                        419, 3052, 4420, 5877, 7975, 9590, 11343, 14944, 16963, 48610, 54490, 60730, 68950, 75900, 83800, 93400, 99710, 444900,
-                    ],
-                },
-                Ca: {
-                    name: "Calcium",
-                    atomicNumber: 20,
-                    color: "#3DFF00", // Bright lime
-                    shellConfiguration: [2, 8, 8, 2],
-                    shellIonizationEnergies: {
-                        0: [384400, 418300], // Inner shell (1s)
-                        1: [40800, 48500, 57600, 67000, 77200, 88400, 102000, 113000], // Second shell (2s, 2p)
-                        2: [5470, 7200, 9500, 12300, 15900, 20100, 24800, 29700], // Third shell (3s, 3p)
-                        3: [590, 1145], // Outer shell (4s)
-                    },
-                    sequentialIonizationEnergies: [
-                        590, 1145, 4912, 6474, 8144, 10496, 12270, 14206, 18191, 20385, 57110, 63410, 70110, 78890, 86310, 94700, 104900, 111711, 494850,
                     ],
                 },
                 Rb: {
@@ -283,6 +253,36 @@
                     },
                     sequentialIonizationEnergies: [
                         376, 2234, 3170, 4355, 5210, 6273, 7238, 8781, 9900, 23400, 25600, 28100, 30900, 34000, 37400, 41100, 45100, 49500, 54300, 59500, 65100, 71100, 77500, 84300, 91600, 99400, 107700, 116500, 125800, 135700, 146100, 157100, 168700, 180900, 193700, 207100, 221100, 235800, 251200, 267300, 284200, 301900, 320400, 339800, 360100, 381300, 403500, 426700, 450900, 476200, 502600, 530100, 558800, 588700, 619800,
+                    ],
+                },
+                K: {
+                    name: "Potassium",
+                    atomicNumber: 19,
+                    color: "#8F40D4", // Purple
+                    shellConfiguration: [2, 8, 8, 1],
+                    shellIonizationEnergies: {
+                        0: [354600, 387600], // Inner shell (1s)
+                        1: [37700, 44900, 53500, 62300, 72100, 82700, 96300, 106800], // Second shell (2s, 2p)
+                        2: [4610, 6300, 8400, 11200, 14700, 18800, 23300, 27700], // Third shell (3s, 3p)
+                        3: [419], // Outer shell (4s)
+                    },
+                    sequentialIonizationEnergies: [
+                        419, 3052, 4420, 5877, 7975, 9590, 11343, 14944, 16963, 48610, 54490, 60730, 68950, 75900, 83800, 93400, 99710, 444900,
+                    ],
+                },
+                Ca: {
+                    name: "Calcium",
+                    atomicNumber: 20,
+                    color: "#3DFF00", // Bright lime
+                    shellConfiguration: [2, 8, 8, 2],
+                    shellIonizationEnergies: {
+                        0: [384400, 418300], // Inner shell (1s)
+                        1: [40800, 48500, 57600, 67000, 77200, 88400, 102000, 113000], // Second shell (2s, 2p)
+                        2: [5470, 7200, 9500, 12300, 15900, 20100, 24800, 29700], // Third shell (3s, 3p)
+                        3: [590, 1145], // Outer shell (4s)
+                    },
+                    sequentialIonizationEnergies: [
+                        590, 1145, 4912, 6474, 8144, 10496, 12270, 14206, 18191, 20385, 57110, 63410, 70110, 78890, 86310, 94700, 104900, 111711, 494850,
                     ],
                 },
             };
@@ -322,7 +322,7 @@
                 const shellEnergies = elements[selectedElement].shellIonizationEnergies;
 
                 const removedFromShell = ionizationDetails.filter(
-                    (detail) => detail.shell === shellIndex
+                    (detail) => detail.shell === shellIndex && detail.element === selectedElement
                 ).length;
 
                 if (shellEnergies[shellIndex] && shellEnergies[shellIndex][removedFromShell]) {
@@ -340,7 +340,6 @@
                 setEnergyValue(0);
                 setResetKey((prev) => prev + 1);
                 setCompletedIonizations([]);
-                setIonizationDetails([]);
                 setIsDragging(false);
                 setCurrentDraggedShell(null);
 
@@ -365,7 +364,6 @@
                 setDragStartPosition({ x: 0, y: 0 });
                 setEnergyValue(0);
                 setCompletedIonizations([]);
-                setIonizationDetails([]);
                 setIsDragging(false);
                 setCurrentDraggedShell(null);
 
@@ -377,8 +375,13 @@
 
                 setResetKey((prev) => prev + 1);
 
-                const firstEnergy = elements[element].sequentialIonizationEnergies[0];
-                setMaxEnergy(firstEnergy * 3);
+                // Update max energy to accommodate all previous ionizations plus this element
+                const allEnergies = [
+                    ...ionizationDetails.map(d => d.energy),
+                    elements[element].sequentialIonizationEnergies[0]
+                ];
+                const maxEnergyFromAll = Math.max(...allEnergies);
+                setMaxEnergy(maxEnergyFromAll * 1.5);
             };
 
             // Toggle whether inner shell electrons can be removed
@@ -573,7 +576,7 @@
                 const shellName = getShellName(shellIndex, totalShells);
 
                 const removedFromShell = ionizationDetails.filter(
-                    (detail) => detail.shell === shellIndex
+                    (detail) => detail.shell === shellIndex && detail.element === selectedElement
                 ).length;
 
                 const newShellElectronCounts = { ...shellElectronCounts };
@@ -589,6 +592,7 @@
                     electronNumber: electronIndex + 1,
                     removeNumber: removedFromShell + 1,
                     energy: actualEnergy,
+                    element: selectedElement,
                 };
 
                 const newIonizationDetails = [...ionizationDetails, newDetail];
@@ -1039,7 +1043,23 @@
                                 width: "100%",
                                 marginTop: "60px",
                             }
-                        }, 
+                        }, [
+                            // Clear All button
+                            ionizationDetails.length > 0 && React.createElement('button', {
+                                key: 'clear-all-btn',
+                                style: {
+                                    padding: "6px 12px",
+                                    backgroundColor: "#e74c3c",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    cursor: "pointer",
+                                    marginBottom: "16px",
+                                    fontSize: "12px",
+                                },
+                                onClick: () => setIonizationDetails([])
+                            }, 'Clear All Comparisons'),
+
                             React.createElement('div', {
                                 style: {
                                     display: "flex",
@@ -1049,8 +1069,10 @@
                                     justifyContent: "left",
                                     margin: "0 auto",
                                     width: "fit-content",
+                                    flexWrap: "wrap",
+                                    maxWidth: "800px",
                                 }
-                            }, ionizationDetails.slice(-3).map((detail, idx) => {
+                            }, ionizationDetails.slice(-8).map((detail, idx) => {
                                 const ionizationEnergy = detail.energy;
                                 const shellColor = shellColors[detail.shellName] || ["#9e9e9e", "#bdbdbd"];
                                 const heightPercentage = getEnergyMeterHeight(ionizationEnergy);
@@ -1113,14 +1135,24 @@
                                     React.createElement('div', {
                                         key: 'shell-name',
                                         style: {
-                                            fontSize: "14px",
+                                            fontSize: "13px",
                                             fontWeight: "500",
-                                            marginTop: "8px",
+                                            marginTop: "6px",
                                         }
-                                    }, detail.shellName)
+                                    }, detail.shellName),
+
+                                    React.createElement('div', {
+                                        key: 'element-name',
+                                        style: {
+                                            fontSize: "12px",
+                                            fontWeight: "600",
+                                            marginTop: "2px",
+                                            color: elements[detail.element]?.color || "#333",
+                                        }
+                                    }, detail.element)
                                 ]);
                             }))
-                        )
+                        ])
                     ]),
 
                     React.createElement('div', {
@@ -1141,7 +1173,7 @@
                                 cursor: "pointer",
                             },
                             onClick: resetSimulation
-                        }, 'Reset')
+                        }, 'Reset Current Element')
                     )
                 ]),
 
@@ -1175,14 +1207,35 @@
                             }
                         }, [
                             React.createElement('div', {
-                                key: 'shell-name',
+                                key: 'element-header',
                                 style: {
-                                    fontWeight: "500",
-                                    fontSize: "14px",
-                                    color: shellColor[0],
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
                                     marginBottom: "4px",
                                 }
-                            }, detail.shellName),
+                            }, [
+                                React.createElement('span', {
+                                    key: 'shell-name',
+                                    style: {
+                                        fontWeight: "500",
+                                        fontSize: "14px",
+                                        color: shellColor[0],
+                                    }
+                                }, detail.shellName),
+                                
+                                React.createElement('span', {
+                                    key: 'element-symbol',
+                                    style: {
+                                        fontWeight: "600",
+                                        fontSize: "13px",
+                                        color: elements[detail.element]?.color || "#333",
+                                        backgroundColor: "rgba(255,255,255,0.8)",
+                                        padding: "2px 6px",
+                                        borderRadius: "3px",
+                                    }
+                                }, detail.element)
+                            ]),
                             
                             React.createElement('div', {
                                 key: 'electron-info',
