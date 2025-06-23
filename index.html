@@ -47,7 +47,7 @@
             // New state for nuclear view
             const [activeTab, setActiveTab] = useState("chemical");
             const [nucleons, setNucleons] = useState([]);
-            const [currentNucleus, setCurrentNucleus] = useState({ protons: 3, neutrons: 4, element: "Li" });
+            const [currentNucleus, setCurrentNucleus] = useState({ protons: 3, neutrons: 4, element: "Lithium" });
             const [completedNuclearRemovals, setCompletedNuclearRemovals] = useState([]);
             const [nuclearDetails, setNuclearDetails] = useState([]);
             
@@ -65,15 +65,27 @@
                 neutron: 520000,
             };
 
-            // Function to get element symbol from proton count
-            const getElementFromProtons = (protonCount) => {
+            // Function to get element name from proton count
+            const getElementNameFromProtons = (protonCount) => {
                 const elementMap = {
-                    1: "H",
-                    2: "He", 
-                    3: "Li",
-                    4: "Be"
+                    1: "Hydrogen",
+                    2: "Helium", 
+                    3: "Lithium",
+                    4: "Beryllium"
                 };
-                return elementMap[protonCount] || "?";
+                return elementMap[protonCount] || "Unknown";
+            };
+
+            // Function to check if current state is stable
+            const isStable = () => {
+                const originalElectrons = 3; // Lithium starts with 3 electrons
+                const currentElectrons = Object.values(shellElectronCounts).reduce((sum, count) => sum + count, 0);
+                const electronsRemoved = originalElectrons - currentElectrons;
+                
+                // Stable if nucleus unchanged AND (neutral atom OR +1 ion)
+                return (currentNucleus.protons === 3 && 
+                        currentNucleus.neutrons === 4 && 
+                        (electronsRemoved === 0 || electronsRemoved === 1));
             };
 
             // Define consistent colors for each shell type
@@ -413,7 +425,7 @@
                 const newNucleus = { ...currentNucleus };
                 if (nucleonType === 'proton') {
                     newNucleus.protons -= 1;
-                    newNucleus.element = getElementFromProtons(newNucleus.protons);
+                    newNucleus.element = getElementNameFromProtons(newNucleus.protons);
                 } else {
                     newNucleus.neutrons -= 1;
                 }
@@ -454,7 +466,7 @@
                 // Reset nuclear state
                 setCompletedNuclearRemovals([]);
                 setNuclearDetails([]);
-                setCurrentNucleus({ protons: 3, neutrons: 4, element: "Li" });
+                setCurrentNucleus({ protons: 3, neutrons: 4, element: "Lithium" });
                 
                 // Reset wiggling state
                 setMouseHistory([]);
@@ -1335,7 +1347,7 @@
                     React.createElement('p', {
                         key: 'nuclear-description',
                         style: { fontSize: "14px", color: "#666", marginBottom: "10px" }
-                    },
+                    }, 'Electrons: drag normally. Protons/neutrons: drag AND move back and forth to build energy!')
                 ]),
 
                 // Main simulation container
@@ -1361,8 +1373,8 @@
                     activeTab === "nuclear" && React.createElement('div', {
                         key: 'featured-nuclear-info',
                         style: {
-                            backgroundColor: currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "#d4edda" : "#f8d7da",
-                            border: `3px solid ${currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "#28a745" : "#dc3545"}`,
+                            backgroundColor: isStable() ? "#d4edda" : "#f8d7da",
+                            border: `3px solid ${isStable() ? "#28a745" : "#dc3545"}`,
                             borderRadius: "12px",
                             padding: "20px",
                             marginBottom: "20px",
@@ -1379,7 +1391,7 @@
                                 marginBottom: "8px",
                                 letterSpacing: "2px"
                             }
-                        }, `${currentNucleus.element}-${currentNucleus.protons + currentNucleus.neutrons}`),
+                        }, currentNucleus.element),
                         
                         React.createElement('div', {
                             key: 'composition',
@@ -1395,7 +1407,7 @@
                             key: 'stability-badge',
                             style: {
                                 display: "inline-block",
-                                backgroundColor: currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "#28a745" : "#dc3545",
+                                backgroundColor: isStable() ? "#28a745" : "#dc3545",
                                 color: "white",
                                 padding: "8px 20px",
                                 borderRadius: "25px",
@@ -1405,7 +1417,7 @@
                                 letterSpacing: "1px",
                                 boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
                             }
-                        }, currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "● STABLE NUCLEUS ●" : "⚠ UNSTABLE NUCLEUS ⚠"),
+                        }, isStable() ? "STABLE" : "UNSTABLE"),
                         
                         React.createElement('div', {
                             key: 'removals-count',
@@ -1415,7 +1427,7 @@
                                 marginTop: "10px",
                                 fontStyle: "italic"
                             }
-                        },
+                        }, `Total Particles Removed: ${completedIonizations.length + completedNuclearRemovals.length}`)
                     ]),
                     
                     // Regular element info for chemical view
@@ -2027,7 +2039,7 @@
                                 React.createElement('div', {
                                     key: 'result-info',
                                     style: { fontSize: "13px" }
-                                }, `Result: ${detail.resultingElement}-${detail.resultingMass}`)
+                                }, `Result: ${detail.resultingElement}`)
                             ]);
                         })
                     ])
