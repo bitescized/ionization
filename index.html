@@ -1356,14 +1356,73 @@
                     }, activeTab === "chemical" 
                         ? `${elements[selectedElement].name} (${selectedElement})`
                         : "Subatomic Particle Comparison"),
+
+                    // Featured element info for nuclear view
+                    activeTab === "nuclear" && React.createElement('div', {
+                        key: 'featured-nuclear-info',
+                        style: {
+                            backgroundColor: currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "#d4edda" : "#f8d7da",
+                            border: `3px solid ${currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "#28a745" : "#dc3545"}`,
+                            borderRadius: "12px",
+                            padding: "20px",
+                            marginBottom: "20px",
+                            textAlign: "center",
+                            boxShadow: "0 4px 8px rgba(0,0,0,0.1)"
+                        }
+                    }, [
+                        React.createElement('div', {
+                            key: 'element-display',
+                            style: {
+                                fontSize: "36px",
+                                fontWeight: "bold",
+                                color: "#2c3e50",
+                                marginBottom: "8px",
+                                letterSpacing: "2px"
+                            }
+                        }, `${currentNucleus.element}-${currentNucleus.protons + currentNucleus.neutrons}`),
+                        
+                        React.createElement('div', {
+                            key: 'composition',
+                            style: {
+                                fontSize: "18px",
+                                color: "#495057",
+                                marginBottom: "12px",
+                                fontWeight: "500"
+                            }
+                        }, `${currentNucleus.protons} Protons • ${currentNucleus.neutrons} Neutrons • ${Object.values(shellElectronCounts).reduce((sum, count) => sum + count, 0)} Electrons`),
+                        
+                        React.createElement('div', {
+                            key: 'stability-badge',
+                            style: {
+                                display: "inline-block",
+                                backgroundColor: currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "#28a745" : "#dc3545",
+                                color: "white",
+                                padding: "8px 20px",
+                                borderRadius: "25px",
+                                fontSize: "16px",
+                                fontWeight: "bold",
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
+                                boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                            }
+                        }, currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "● STABLE NUCLEUS ●" : "⚠ UNSTABLE NUCLEUS ⚠"),
+                        
+                        React.createElement('div', {
+                            key: 'removals-count',
+                            style: {
+                                fontSize: "14px",
+                                color: "#6c757d",
+                                marginTop: "10px",
+                                fontStyle: "italic"
+                            }
+                        }, `Total Particles Removed: ${completedIonizations.length + completedNuclearRemovals.length}`)
+                    ]),
                     
-                    React.createElement('p', {
+                    // Regular element info for chemical view
+                    activeTab === "chemical" && React.createElement('p', {
                         key: 'element-info',
                         style: { fontSize: "14px", marginBottom: "10px" }
-                    }, activeTab === "chemical" ? 
-                        `Atomic Number: ${elements[selectedElement].atomicNumber} | Electrons: ${Object.values(shellElectronCounts).reduce((sum, count) => sum + count, 0)} | Ionizations: ${completedIonizations.length}` :
-                        `Element: ${currentNucleus.element} | Protons: ${currentNucleus.protons} | Neutrons: ${currentNucleus.neutrons} | Electrons: ${Object.values(shellElectronCounts).reduce((sum, count) => sum + count, 0)} | ${currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "Stable" : "Unstable"}`
-                    ),
+                    }, `Atomic Number: ${elements[selectedElement].atomicNumber} | Electrons: ${Object.values(shellElectronCounts).reduce((sum, count) => sum + count, 0)} | Ionizations: ${completedIonizations.length}`),
 
                     React.createElement('div', {
                         key: 'simulation-area',
