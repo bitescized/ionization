@@ -1,1264 +1,1451 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Ionization Energy Simulation</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Poppins', sans-serif;
-            background-color: white;
+import React, { useState, useEffect, useRef } from "react";
+
+export default function App() {
+  // State for the simulation
+  const [selectedElement, setSelectedElement] = useState(null);
+  const [activeDragIndex, setActiveDragIndex] = useState(null);
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [dragStartPosition, setDragStartPosition] = useState({ x: 0, y: 0 });
+  const [completedIonizations, setCompletedIonizations] = useState([]);
+  const [ionizationDetails, setIonizationDetails] = useState([]);
+  const [energyValue, setEnergyValue] = useState(0);
+  const [maxEnergy, setMaxEnergy] = useState(3000);
+  const [isDragging, setIsDragging] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
+  const [electrons, setElectrons] = useState([]);
+  const [allowInnerShellRemoval, setAllowInnerShellRemoval] = useState(true);
+  const [shellElectronCounts, setShellElectronCounts] = useState({});
+  const [currentDraggedShell, setCurrentDraggedShell] = useState(null);
+  
+  // New state for nuclear view
+  const [activeTab, setActiveTab] = useState("chemical");
+  const [nucleons, setNucleons] = useState([]);
+  const [currentNucleus, setCurrentNucleus] = useState({ protons: 3, neutrons: 4, element: "Li" });
+  const [completedNuclearRemovals, setCompletedNuclearRemovals] = useState([]);
+  const [nuclearDetails, setNuclearDetails] = useState([]);
+  
+  // New state for wiggling mechanics
+  const [mouseHistory, setMouseHistory] = useState([]);
+  const [wiggleEnergy, setWiggleEnergy] = useState(0);
+
+  // Canvas ref for electron animation
+  const canvasRef = useRef(null);
+  const animationFrameRef = useRef(null);
+
+  // Nuclear binding energies (in kJ/mol) - approximate values for separation energy
+  const nuclearBindingEnergies = {
+    proton: 540000, // ~5.6 MeV converted to kJ/mol
+    neutron: 520000, // ~5.4 MeV converted to kJ/mol
+  };
+
+  // Function to get element symbol from proton count
+  const getElementFromProtons = (protonCount) => {
+    const elementMap = {
+      1: "H",
+      2: "He", 
+      3: "Li",
+      4: "Be"
+    };
+    return elementMap[protonCount] || "?";
+  };
+
+  // Define consistent colors for each shell type
+  const shellColors = {
+    "Inner Shell": ["#4caf50", "#a5d6a7"], // Green for inner shell
+    "Middle Shell": ["#7b1fa2", "#ab47bc"], // Purple for middle shell
+    "Outer Shell": ["#1976d2", "#42a5f5"], // Blue for outer shell
+  };
+
+  // Enhanced element data with shell-specific ionization energies
+  const elements = {
+    Li: {
+      name: "Lithium",
+      atomicNumber: 3,
+      color: "#900C3F",
+      shellConfiguration: [2, 1],
+      shellIonizationEnergies: {
+        0: [7298, 11815], // Inner shell (1s) - first and second electron
+        1: [520], // Outer shell (2s) - one electron
+      },
+      sequentialIonizationEnergies: [520, 7298, 11815],
+    },
+    Be: {
+      name: "Beryllium",
+      atomicNumber: 4,
+      color: "#C70039",
+      shellConfiguration: [2, 2],
+      shellIonizationEnergies: {
+        0: [14848, 21006],
+        1: [899, 1757],
+      },
+      sequentialIonizationEnergies: [899, 1757, 14848, 21006],
+    },
+    Na: {
+      name: "Sodium",
+      atomicNumber: 11,
+      color: "#FFC300",
+      shellConfiguration: [2, 8, 1],
+      shellIonizationEnergies: {
+        0: [141362, 159075],
+        1: [13354, 16613, 20117, 25496, 28932],
+        2: [496],
+      },
+      sequentialIonizationEnergies: [
+        496, 4562, 6910, 9543, 13354, 16613, 20117, 25496, 28932, 141362, 159075,
+      ],
+    },
+    Mg: {
+      name: "Magnesium",
+      atomicNumber: 12,
+      color: "#FF5733",
+      shellConfiguration: [2, 8, 2],
+      shellIonizationEnergies: {
+        0: [169988, 189368],
+        1: [13630, 17995, 21703, 25661, 31653, 35458],
+        2: [738, 1451],
+      },
+      sequentialIonizationEnergies: [
+        738, 1451, 7733, 10540, 13630, 17995, 21703, 25661, 31653, 35458, 169988, 189368,
+      ],
+    },
+    H: {
+      name: "Hydrogen",
+      atomicNumber: 1,
+      color: "#C0C0C0",
+      shellConfiguration: [1],
+      shellIonizationEnergies: {
+        0: [1312],
+      },
+      sequentialIonizationEnergies: [1312],
+    },
+    He: {
+      name: "Helium",
+      atomicNumber: 2,
+      color: "#D9FFFF",
+      shellConfiguration: [2],
+      shellIonizationEnergies: {
+        0: [2372, 5250],
+      },
+      sequentialIonizationEnergies: [2372, 5250],
+    },
+    O: {
+      name: "Oxygen",
+      atomicNumber: 8,
+      color: "#FF0000",
+      shellConfiguration: [2, 6],
+      shellIonizationEnergies: {
+        0: [32826, 47261],
+        1: [1314, 3388, 5301, 7469, 10990, 13326],
+      },
+      sequentialIonizationEnergies: [
+        1314, 3388, 5301, 7469, 10990, 13326, 32826, 47261,
+      ],
+    },
+    F: {
+      name: "Fluorine",
+      atomicNumber: 9,
+      color: "#90E050",
+      shellConfiguration: [2, 7],
+      shellIonizationEnergies: {
+        0: [37830, 53780],
+        1: [1681, 3374, 6050, 8408, 11023, 15164, 17868],
+      },
+      sequentialIonizationEnergies: [
+        1681, 3374, 6050, 8408, 11023, 15164, 17868, 37830, 53780,
+      ],
+    },
+    Ne: {
+      name: "Neon",
+      atomicNumber: 10,
+      color: "#B3E3F5",
+      shellConfiguration: [2, 8],
+      shellIonizationEnergies: {
+        0: [44400, 63500],
+        1: [2081, 3952, 6122, 9371, 12177, 15238, 19999, 23069],
+      },
+      sequentialIonizationEnergies: [
+        2081, 3952, 6122, 9371, 12177, 15238, 19999, 23069, 44400, 63500,
+      ],
+    },
+    Al: {
+      name: "Aluminum",
+      atomicNumber: 13,
+      color: "#BFA6A6",
+      shellConfiguration: [2, 8, 3],
+      shellIonizationEnergies: {
+        0: [198310, 224950],
+        1: [18828, 23780, 28790, 33900, 39610, 47100, 56290, 63500],
+        2: [578, 1817, 2745],
+      },
+      sequentialIonizationEnergies: [
+        578, 1817, 2745, 11580, 14830, 18380, 23330, 27460, 31850, 38470, 42640, 201400, 222300,
+      ],
+    },
+    Cl: {
+      name: "Chlorine",
+      atomicNumber: 17,
+      color: "#1FF01F",
+      shellConfiguration: [2, 8, 7],
+      shellIonizationEnergies: {
+        0: [299010, 329950],
+        1: [31930, 38430, 45850, 54100, 62700, 72450, 88750, 97920],
+        2: [1251, 2298, 3822, 5158, 6542, 9362, 11018],
+      },
+      sequentialIonizationEnergies: [
+        1251, 2298, 3822, 5158, 6542, 9362, 11018, 23810, 29900, 36000, 43200, 51400, 60400, 70400, 81800, 93400, 352000,
+      ],
+    },
+    Ar: {
+      name: "Argon",
+      atomicNumber: 18,
+      color: "#80D1E3",
+      shellConfiguration: [2, 8, 8],
+      shellIonizationEnergies: {
+        0: [326300, 358200],
+        1: [34800, 41600, 49600, 58400, 67600, 77800, 91000, 100800],
+        2: [1520, 2666, 3931, 5771, 7238, 8781, 11995, 13842],
+      },
+      sequentialIonizationEnergies: [
+        1520, 2666, 3931, 5771, 7238, 8781, 11995, 13842, 40760, 46190, 52500, 59400, 71700, 75000, 88600, 103400, 111700, 386200,
+      ],
+    },
+    K: {
+      name: "Potassium",
+      atomicNumber: 19,
+      color: "#8F40D4",
+      shellConfiguration: [2, 8, 8, 1],
+      shellIonizationEnergies: {
+        0: [354600, 387600],
+        1: [37700, 44900, 53500, 62300, 72100, 82700, 96300, 106800],
+        2: [4610, 6300, 8400, 11200, 14700, 18800, 23300, 27700],
+        3: [419],
+      },
+      sequentialIonizationEnergies: [
+        419, 3052, 4420, 5877, 7975, 9590, 11343, 14944, 16963, 48610, 54490, 60730, 68950, 75900, 83800, 93400, 99710, 444900,
+      ],
+    },
+    Ca: {
+      name: "Calcium",
+      atomicNumber: 20,
+      color: "#3DFF00",
+      shellConfiguration: [2, 8, 8, 2],
+      shellIonizationEnergies: {
+        0: [384400, 418300],
+        1: [40800, 48500, 57600, 67000, 77200, 88400, 102000, 113000],
+        2: [5470, 7200, 9500, 12300, 15900, 20100, 24800, 29700],
+        3: [590, 1145],
+      },
+      sequentialIonizationEnergies: [
+        590, 1145, 4912, 6474, 8144, 10496, 12270, 14206, 18191, 20385, 57110, 63410, 70110, 78890, 86310, 94700, 104900, 111711, 494850,
+      ],
+    },
+  };
+
+  // Function to get shell name by index
+  const getShellName = (shellIndex, totalShells) => {
+    if (totalShells === 1) return "Inner Shell";
+    if (totalShells === 2) {
+      return shellIndex === 0 ? "Inner Shell" : "Outer Shell";
+    }
+    if (shellIndex === 0) return "Inner Shell";
+    if (shellIndex === totalShells - 1) return "Outer Shell";
+    return "Middle Shell";
+  };
+
+  // Calculate energy meter height percentage with a minimum visible height
+  const getEnergyMeterHeight = (value) => {
+    if (value <= 0) return 0;
+    const percentage = (value / maxEnergy) * 100;
+    return Math.max(10, percentage);
+  };
+
+  // Determine ionization energy based on shell and number of electrons already removed from that shell
+  const getIonizationEnergy = (shellIndex, electronIndexInShell) => {
+    if (!selectedElement) return 0;
+
+    const shellEnergies = elements[selectedElement].shellIonizationEnergies;
+    const removedFromShell = ionizationDetails.filter(
+      (detail) => detail.shell === shellIndex
+    ).length;
+
+    if (shellEnergies[shellIndex] && shellEnergies[shellIndex][removedFromShell]) {
+      return shellEnergies[shellIndex][removedFromShell];
+    }
+
+    return Math.max(...elements[selectedElement].sequentialIonizationEnergies) * 1.2;
+  };
+
+  // Update nucleon positions for nuclear view
+  const updateNucleonPositions = () => {
+    const newNucleons = [];
+    const centerX = 200;
+    const centerY = 200;
+    const nucleonRadius = 8;
+    const packingRadius = 15; // Reduced from 25 to pack them closer
+    
+    // Create protons
+    for (let i = 0; i < currentNucleus.protons; i++) {
+      const angle = (i / (currentNucleus.protons + currentNucleus.neutrons)) * 2 * Math.PI;
+      const radius = packingRadius * (0.3 + 0.4 * Math.random()); // Tighter packing range
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      
+      newNucleons.push({
+        id: `proton-${i}`,
+        x,
+        y,
+        type: 'proton',
+        index: i,
+        radius: nucleonRadius,
+      });
+    }
+    
+    // Create neutrons
+    for (let i = 0; i < currentNucleus.neutrons; i++) {
+      const angle = ((i + currentNucleus.protons) / (currentNucleus.protons + currentNucleus.neutrons)) * 2 * Math.PI;
+      const radius = packingRadius * (0.3 + 0.4 * Math.random()); // Tighter packing range
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      
+      newNucleons.push({
+        id: `neutron-${i}`,
+        x,
+        y,
+        type: 'neutron',
+        index: i,
+        radius: nucleonRadius,
+      });
+    }
+    
+    setNucleons(newNucleons);
+  };
+
+  // Handle nuclear particle drag start
+  const startNuclearDrag = (nucleonId, startX, startY, type) => {
+    setIsDragging(true);
+    setActiveDragIndex(nucleonId);
+    setDragStartPosition({ x: startX, y: startY });
+    setDragPosition({ x: startX, y: startY });
+    setCurrentDraggedShell(type === 'proton' ? 'Proton' : 'Neutron');
+    setEnergyValue(0);
+  };
+
+  // Complete nuclear removal
+  const completeNuclearRemoval = (actualEnergy, nucleonType) => {
+    if (activeDragIndex === null) return;
+
+    const newNucleus = { ...currentNucleus };
+    if (nucleonType === 'proton') {
+      newNucleus.protons -= 1;
+      newNucleus.element = getElementFromProtons(newNucleus.protons);
+    } else {
+      newNucleus.neutrons -= 1;
+    }
+    setCurrentNucleus(newNucleus);
+
+    setCompletedNuclearRemovals([...completedNuclearRemovals, activeDragIndex]);
+
+    const newDetail = {
+      particle: activeDragIndex,
+      type: nucleonType,
+      energy: actualEnergy,
+      resultingElement: newNucleus.element,
+      resultingMass: newNucleus.protons + newNucleus.neutrons,
+    };
+
+    setNuclearDetails([...nuclearDetails, newDetail]);
+    setEnergyValue(actualEnergy);
+    setMaxEnergy(actualEnergy * 1.2);
+
+    setActiveDragIndex(null);
+    setIsDragging(false);
+    setCurrentDraggedShell(null);
+
+    updateNucleonPositions();
+  };
+
+  // Reset simulation
+  const resetSimulation = () => {
+    setActiveDragIndex(null);
+    setDragPosition({ x: 0, y: 0 });
+    setDragStartPosition({ x: 0, y: 0 });
+    setEnergyValue(0);
+    setResetKey((prev) => prev + 1);
+    setCompletedIonizations([]);
+    setIonizationDetails([]);
+    setIsDragging(false);
+    setCurrentDraggedShell(null);
+    
+    setCompletedNuclearRemovals([]);
+    setNuclearDetails([]);
+    setCurrentNucleus({ protons: 3, neutrons: 4, element: "Li" });
+    
+    // Reset wiggling state
+    setMouseHistory([]);
+    setWiggleEnergy(0);
+
+    if (selectedElement) {
+      const newShellElectronCounts = {};
+      elements[selectedElement].shellConfiguration.forEach((count, index) => {
+        newShellElectronCounts[index] = count;
+      });
+      setShellElectronCounts(newShellElectronCounts);
+    }
+
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+  };
+
+  // Handle element selection
+  const handleElementSelect = (element) => {
+    setSelectedElement(element);
+
+    setActiveDragIndex(null);
+    setDragPosition({ x: 0, y: 0 });
+    setDragStartPosition({ x: 0, y: 0 });
+    setEnergyValue(0);
+    setCompletedIonizations([]);
+    setIonizationDetails([]);
+    setIsDragging(false);
+    setCurrentDraggedShell(null);
+
+    const newShellElectronCounts = {};
+    elements[element].shellConfiguration.forEach((count, index) => {
+      newShellElectronCounts[index] = count;
+    });
+    setShellElectronCounts(newShellElectronCounts);
+
+    setResetKey((prev) => prev + 1);
+
+    const firstEnergy = elements[element].sequentialIonizationEnergies[0];
+    setMaxEnergy(firstEnergy * 3);
+  };
+
+  // Toggle whether inner shell electrons can be removed
+  const toggleInnerShellRemoval = () => {
+    setAllowInnerShellRemoval(!allowInnerShellRemoval);
+    resetSimulation();
+  };
+
+  // Update electron positions based on current state
+  const updateElectronPositions = () => {
+    if (!selectedElement) return;
+
+    const newElectrons = [];
+    const shellConfig = elements[selectedElement].shellConfiguration;
+    const centerX = 200;
+    const centerY = 200;
+
+    for (let shellIndex = 0; shellIndex < shellConfig.length; shellIndex++) {
+      const originalElectronCount = shellConfig[shellIndex];
+      const currentElectronCount = shellElectronCounts[shellIndex] || 0;
+      const shellRadius = 50 + shellIndex * 40;
+
+      for (let i = 0; i < currentElectronCount; i++) {
+        const angle = (i / originalElectronCount) * 2 * Math.PI;
+        const x = centerX + shellRadius * Math.cos(angle);
+        const y = centerY + shellRadius * Math.sin(angle);
+
+        newElectrons.push({
+          id: `${shellIndex}-${i}`,
+          x,
+          y,
+          shellIndex,
+          electronIndex: i,
+          radius: 8,
+          energy: getIonizationEnergy(shellIndex, i),
+        });
+      }
+    }
+
+    setElectrons(newElectrons);
+  };
+
+  // Handle canvas mouse down
+  const handleCanvasMouseDown = (event) => {
+    if (isDragging || !selectedElement) return;
+
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    if (activeTab === "chemical") {
+      for (const electron of electrons) {
+        const dx = mouseX - electron.x;
+        const dy = mouseY - electron.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance <= electron.radius) {
+          startDrag(
+            electron.shellIndex,
+            electron.electronIndex,
+            electron.x,
+            electron.y,
+            electron.energy
+          );
+          break;
         }
+      }
+    } else if (activeTab === "nuclear") {
+      // Check electrons first
+      for (const electron of electrons) {
+        const dx = mouseX - electron.x;
+        const dy = mouseY - electron.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance <= electron.radius) {
+          startDrag(
+            electron.shellIndex,
+            electron.electronIndex,
+            electron.x,
+            electron.y,
+            electron.energy
+          );
+          return; // Exit early if electron was clicked
+        }
+      }
+
+      // If no electron was clicked, check nucleons
+      for (const nucleon of nucleons) {
+        const dx = mouseX - nucleon.x;
+        const dy = mouseY - nucleon.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance <= nucleon.radius) {
+          startNuclearDrag(
+            nucleon.id,
+            nucleon.x,
+            nucleon.y,
+            nucleon.type
+          );
+          break;
+        }
+      }
+    }
+  };
+
+  // Start dragging an electron
+  const startDrag = (shellIndex, electronIndex, startX, startY, energy) => {
+    if (!selectedElement) return;
+
+    if (!allowInnerShellRemoval) {
+      const shellConfig = elements[selectedElement].shellConfiguration;
+      const lastShellIndex = shellConfig.length - 1;
+
+      if (shellIndex !== lastShellIndex && shellElectronCounts[lastShellIndex] > 0) {
+        return;
+      }
+    }
+
+    setIsDragging(true);
+    setActiveDragIndex(`${shellIndex}-${electronIndex}`);
+    setDragStartPosition({ x: startX, y: startY });
+    setDragPosition({ x: startX, y: startY });
+
+    const totalShells = elements[selectedElement].shellConfiguration.length;
+    const shellName = getShellName(shellIndex, totalShells);
+    setCurrentDraggedShell(shellName);
+
+    setEnergyValue(0);
+  };
+
+  // Continue dragging
+  const handleMouseMove = (event) => {
+    if (!isDragging || activeDragIndex === null || !selectedElement) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    setDragPosition({ x, y });
+
+    // Calculate distance from starting position
+    const dx = x - dragStartPosition.x;
+    const dy = y - dragStartPosition.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Update mouse history for wiggling detection
+    const newMouseHistory = [...mouseHistory, { x, y, time: Date.now() }].slice(-10); // Keep last 10 positions
+    setMouseHistory(newMouseHistory);
+
+    // Calculate wiggling intensity (direction changes)
+    let wiggleIntensity = 0;
+    if (newMouseHistory.length >= 5) {
+      let directionChanges = 0;
+      for (let i = 2; i < newMouseHistory.length - 1; i++) {
+        const prev = newMouseHistory[i - 1];
+        const curr = newMouseHistory[i];
+        const next = newMouseHistory[i + 1];
         
-        #root {
-            min-height: 100vh;
+        const dir1 = Math.atan2(curr.y - prev.y, curr.x - prev.x);
+        const dir2 = Math.atan2(next.y - curr.y, next.x - curr.x);
+        
+        let angleDiff = Math.abs(dir2 - dir1);
+        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+        
+        if (angleDiff > Math.PI / 3) { // Significant direction change
+          directionChanges++;
         }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
-
-        function App() {
-            // State for the simulation
-            const [selectedElement, setSelectedElement] = useState(null);
-            const [activeDragIndex, setActiveDragIndex] = useState(null);
-            const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
-            const [dragStartPosition, setDragStartPosition] = useState({ x: 0, y: 0 });
-            const [completedIonizations, setCompletedIonizations] = useState([]);
-            const [ionizationDetails, setIonizationDetails] = useState([]);
-            const [energyValue, setEnergyValue] = useState(0);
-            const [maxEnergy, setMaxEnergy] = useState(3000);
-            const [isDragging, setIsDragging] = useState(false);
-            const [resetKey, setResetKey] = useState(0);
-            const [electrons, setElectrons] = useState([]);
-            const [allowInnerShellRemoval, setAllowInnerShellRemoval] = useState(true);
-            const [shellElectronCounts, setShellElectronCounts] = useState({});
-            const [currentDraggedShell, setCurrentDraggedShell] = useState(null);
-
-            // Canvas ref for electron animation
-            const canvasRef = useRef(null);
-            const animationFrameRef = useRef(null);
-
-            // Define consistent colors for each shell type
-            const shellColors = {
-                "Inner Shell": ["#4caf50", "#a5d6a7"], // Green for inner shell
-                "Middle Shell": ["#7b1fa2", "#ab47bc"], // Purple for middle shell
-                "Outer Shell": ["#1976d2", "#42a5f5"], // Blue for outer shell
-            };
-
-            // Enhanced element data with shell-specific ionization energies
-            const elements = {
-                Li: {
-                    name: "Lithium",
-                    atomicNumber: 3,
-                    color: "#900C3F",
-                    shellConfiguration: [2, 1],
-                    shellIonizationEnergies: {
-                        0: [7298, 11815], // Inner shell (1s) - first and second electron
-                        1: [520], // Outer shell (2s) - one electron
-                    },
-                    sequentialIonizationEnergies: [520, 7298, 11815],
-                },
-                Be: {
-                    name: "Beryllium",
-                    atomicNumber: 4,
-                    color: "#C70039",
-                    shellConfiguration: [2, 2],
-                    shellIonizationEnergies: {
-                        0: [14848, 21006], // Inner shell (1s) - first and second electron
-                        1: [899, 1757], // Outer shell (2s) - first and second electron
-                    },
-                    sequentialIonizationEnergies: [899, 1757, 14848, 21006],
-                },
-                Na: {
-                    name: "Sodium",
-                    atomicNumber: 11,
-                    color: "#FFC300",
-                    shellConfiguration: [2, 8, 1],
-                    shellIonizationEnergies: {
-                        0: [141362, 159075], // Inner shell (1s) - first and second electron
-                        1: [13354, 16613, 20117, 25496, 28932], // Middle shell (2s, 2p) - 8 electrons
-                        2: [496], // Outer shell (3s) - one electron
-                    },
-                    sequentialIonizationEnergies: [
-                        496, 4562, 6910, 9543, 13354, 16613, 20117, 25496, 28932, 141362, 159075,
-                    ],
-                },
-                Mg: {
-                    name: "Magnesium",
-                    atomicNumber: 12,
-                    color: "#FF5733",
-                    shellConfiguration: [2, 8, 2],
-                    shellIonizationEnergies: {
-                        0: [169988, 189368], // Inner shell (1s) - first and second electron
-                        1: [13630, 17995, 21703, 25661, 31653, 35458], // Middle shell (2s, 2p) - 8 electrons
-                        2: [738, 1451], // Outer shell (3s) - two electrons
-                    },
-                    sequentialIonizationEnergies: [
-                        738, 1451, 7733, 10540, 13630, 17995, 21703, 25661, 31653, 35458, 169988, 189368,
-                    ],
-                },
-                H: {
-                    name: "Hydrogen",
-                    atomicNumber: 1,
-                    color: "#C0C0C0", // Silver
-                    shellConfiguration: [1],
-                    shellIonizationEnergies: {
-                        0: [1312], // Single electron in 1s
-                    },
-                    sequentialIonizationEnergies: [1312],
-                },
-                He: {
-                    name: "Helium",
-                    atomicNumber: 2,
-                    color: "#D9FFFF", // Light cyan
-                    shellConfiguration: [2],
-                    shellIonizationEnergies: {
-                        0: [2372, 5250], // Two electrons in 1s
-                    },
-                    sequentialIonizationEnergies: [2372, 5250],
-                },
-                O: {
-                    name: "Oxygen",
-                    atomicNumber: 8,
-                    color: "#FF0000", // Red
-                    shellConfiguration: [2, 6],
-                    shellIonizationEnergies: {
-                        0: [32826, 47261], // Inner shell (1s)
-                        1: [1314, 3388, 5301, 7469, 10990, 13326], // Outer shell (2s, 2p)
-                    },
-                    sequentialIonizationEnergies: [
-                        1314, 3388, 5301, 7469, 10990, 13326, 32826, 47261,
-                    ],
-                },
-                F: {
-                    name: "Fluorine",
-                    atomicNumber: 9,
-                    color: "#90E050", // Yellow-green
-                    shellConfiguration: [2, 7],
-                    shellIonizationEnergies: {
-                        0: [37830, 53780], // Inner shell (1s)
-                        1: [1681, 3374, 6050, 8408, 11023, 15164, 17868], // Outer shell (2s, 2p)
-                    },
-                    sequentialIonizationEnergies: [
-                        1681, 3374, 6050, 8408, 11023, 15164, 17868, 37830, 53780,
-                    ],
-                },
-                Ne: {
-                    name: "Neon",
-                    atomicNumber: 10,
-                    color: "#B3E3F5", // Light blue
-                    shellConfiguration: [2, 8],
-                    shellIonizationEnergies: {
-                        0: [44400, 63500], // Inner shell (1s)
-                        1: [2081, 3952, 6122, 9371, 12177, 15238, 19999, 23069], // Outer shell (2s, 2p)
-                    },
-                    sequentialIonizationEnergies: [
-                        2081, 3952, 6122, 9371, 12177, 15238, 19999, 23069, 44400, 63500,
-                    ],
-                },
-                Al: {
-                    name: "Aluminum",
-                    atomicNumber: 13,
-                    color: "#BFA6A6", // Gray-brown
-                    shellConfiguration: [2, 8, 3],
-                    shellIonizationEnergies: {
-                        0: [198310, 224950], // Inner shell (1s)
-                        1: [18828, 23780, 28790, 33900, 39610, 47100, 56290, 63500], // Middle shell (2s, 2p)
-                        2: [578, 1817, 2745], // Outer shell (3s, 3p)
-                    },
-                    sequentialIonizationEnergies: [
-                        578, 1817, 2745, 11580, 14830, 18380, 23330, 27460, 31850, 38470, 42640, 201400, 222300,
-                    ],
-                },
-                Cl: {
-                    name: "Chlorine",
-                    atomicNumber: 17,
-                    color: "#1FF01F", // Bright green
-                    shellConfiguration: [2, 8, 7],
-                    shellIonizationEnergies: {
-                        0: [299010, 329950], // Inner shell (1s)
-                        1: [31930, 38430, 45850, 54100, 62700, 72450, 88750, 97920], // Middle shell (2s, 2p)
-                        2: [1251, 2298, 3822, 5158, 6542, 9362, 11018], // Outer shell (3s, 3p)
-                    },
-                    sequentialIonizationEnergies: [
-                        1251, 2298, 3822, 5158, 6542, 9362, 11018, 23810, 29900, 36000, 43200, 51400, 60400, 70400, 81800, 93400, 352000,
-                    ],
-                },
-                Ar: {
-                    name: "Argon",
-                    atomicNumber: 18,
-                    color: "#80D1E3", // Light teal
-                    shellConfiguration: [2, 8, 8],
-                    shellIonizationEnergies: {
-                        0: [326300, 358200], // Inner shell (1s)
-                        1: [34800, 41600, 49600, 58400, 67600, 77800, 91000, 100800], // Middle shell (2s, 2p)
-                        2: [1520, 2666, 3931, 5771, 7238, 8781, 11995, 13842], // Outer shell (3s, 3p)
-                    },
-                    sequentialIonizationEnergies: [
-                        1520, 2666, 3931, 5771, 7238, 8781, 11995, 13842, 40760, 46190, 52500, 59400, 71700, 75000, 88600, 103400, 111700, 386200,
-                    ],
-                },
-                S: {
-                    name: "Sulfur",
-                    atomicNumber: 16,
-                    color: "#FFFF30", // Bright yellow
-                    shellConfiguration: [2, 8, 6],
-                    shellIonizationEnergies: {
-                        0: [32826, 47261], // Inner shell (1s)
-                        1: [2252, 2673, 3361, 4564, 7013, 8496, 27107, 31669], // Middle shell (2s, 2p)
-                        2: [1000, 2252, 3357, 4556, 7004, 8495], // Outer shell (3s, 3p)
-                    },
-                    sequentialIonizationEnergies: [
-                        1000, 2252, 3357, 4556, 7004, 8495, 27107, 31669, 72594, 88049, 108100, 128558, 164934, 200000, 230766, 284766,
-                    ],
-                },
-                Rb: {
-                    name: "Rubidium",
-                    atomicNumber: 37,
-                    color: "#702EB0", // Purple
-                    shellConfiguration: [2, 8, 18, 8, 1],
-                    shellIonizationEnergies: {
-                        0: [684600, 750600], // Inner shell (1s)
-                        1: [93200, 106900, 122100, 138900, 157100, 177500, 200200, 225500], // Second shell (2s, 2p)
-                        2: [15200, 16500, 18100, 19900, 22000, 24400, 27100, 30100, 33500, 37200, 41300, 45800, 50800, 56300, 62400, 69000, 76100, 83900], // Third shell (3s, 3p, 3d)
-                        3: [2633, 4857, 6910, 9543, 13354, 16613, 20117, 25496], // Fourth shell (4s, 4p)
-                        4: [403], // Outer shell (5s)
-                    },
-                    sequentialIonizationEnergies: [
-                        403, 2633, 3859, 5080, 6850, 8140, 9570, 13120, 14500, 26740, 28700, 30940, 33410, 36170, 39240, 42640, 46400, 50530, 55060, 60000, 65370, 71200, 77520, 84360, 91750, 99730, 108340, 117610, 127590, 138320, 149840, 162200, 175450, 189640, 204820, 221040, 238370,
-                    ],
-                },
-                Cs: {
-                    name: "Cesium",
-                    atomicNumber: 55,
-                    color: "#57178F", // Dark purple
-                    shellConfiguration: [2, 8, 18, 18, 8, 1],
-                    shellIonizationEnergies: {
-                        0: [1071400, 1171000], // Inner shell (1s)
-                        1: [169800, 192300, 217100, 244700, 275300, 309100, 346400, 387600], // Second shell (2s, 2p)
-                        2: [54400, 58800, 63800, 69300, 75400, 82100, 89500, 97600, 106400, 116000, 126400, 137700, 149900, 163100, 177400, 192900, 209700, 227900], // Third shell (3s, 3p, 3d)
-                        3: [11200, 12300, 13500, 14800, 16300, 17900, 19700, 21700, 23900, 26300, 28900, 31800, 35000, 38500, 42300, 46400, 50900, 55800], // Fourth shell (4s, 4p, 4d)
-                        4: [2234, 4355, 6273, 8781, 12800, 14900, 17500, 20600], // Fifth shell (5s, 5p)
-                        5: [376], // Outer shell (6s)
-                    },
-                    sequentialIonizationEnergies: [
-                        376, 2234, 3170, 4355, 5210, 6273, 7238, 8781, 9900, 23400, 25600, 28100, 30900, 34000, 37400, 41100, 45100, 49500, 54300, 59500, 65100, 71100, 77500, 84300, 91600, 99400, 107700, 116500, 125800, 135700, 146100, 157100, 168700, 180900, 193700, 207100, 221100, 235800, 251200, 267300, 284200, 301900, 320400, 339800, 360100, 381300, 403500, 426700, 450900, 476200, 502600, 530100, 558800, 588700, 619800,
-                    ],
-                },
-                K: {
-                    name: "Potassium",
-                    atomicNumber: 19,
-                    color: "#8F40D4", // Purple
-                    shellConfiguration: [2, 8, 8, 1],
-                    shellIonizationEnergies: {
-                        0: [354600, 387600], // Inner shell (1s)
-                        1: [37700, 44900, 53500, 62300, 72100, 82700, 96300, 106800], // Second shell (2s, 2p)
-                        2: [4610, 6300, 8400, 11200, 14700, 18800, 23300, 27700], // Third shell (3s, 3p)
-                        3: [419], // Outer shell (4s)
-                    },
-                    sequentialIonizationEnergies: [
-                        419, 3052, 4420, 5877, 7975, 9590, 11343, 14944, 16963, 48610, 54490, 60730, 68950, 75900, 83800, 93400, 99710, 444900,
-                    ],
-                },
-                Ca: {
-                    name: "Calcium",
-                    atomicNumber: 20,
-                    color: "#3DFF00", // Bright lime
-                    shellConfiguration: [2, 8, 8, 2],
-                    shellIonizationEnergies: {
-                        0: [384400, 418300], // Inner shell (1s)
-                        1: [40800, 48500, 57600, 67000, 77200, 88400, 102000, 113000], // Second shell (2s, 2p)
-                        2: [5470, 7200, 9500, 12300, 15900, 20100, 24800, 29700], // Third shell (3s, 3p)
-                        3: [590, 1145], // Outer shell (4s)
-                    },
-                    sequentialIonizationEnergies: [
-                        590, 1145, 4912, 6474, 8144, 10496, 12270, 14206, 18191, 20385, 57110, 63410, 70110, 78890, 86310, 94700, 104900, 111711, 494850,
-                    ],
-                },
-            };
-
-            // Function to get shell name by index
-            const getShellName = (shellIndex, totalShells) => {
-                if (totalShells === 1) return "Inner Shell";
-                if (totalShells === 2) {
-                    return shellIndex === 0 ? "Inner Shell" : "Outer Shell";
-                }
-                if (shellIndex === 0) return "Inner Shell";
-                if (shellIndex === totalShells - 1) return "Outer Shell";
-                return "Middle Shell";
-            };
-
-            // Calculate total electrons in the selected element
-            const getTotalElectrons = () => {
-                if (!selectedElement) return 0;
-                return elements[selectedElement].shellConfiguration.reduce(
-                    (sum, count) => sum + count,
-                    0
-                );
-            };
-
-            // Calculate energy meter height percentage with a minimum visible height
-            const getEnergyMeterHeight = (value) => {
-                if (value <= 0) return 0;
-                const percentage = (value / maxEnergy) * 100;
-                return Math.max(10, percentage);
-            };
-
-            // Determine ionization energy based on shell and number of electrons already removed from that shell
-            const getIonizationEnergy = (shellIndex, electronIndexInShell) => {
-                if (!selectedElement) return 0;
-
-                const shellConfig = elements[selectedElement].shellConfiguration;
-                const shellEnergies = elements[selectedElement].shellIonizationEnergies;
-
-                const removedFromShell = ionizationDetails.filter(
-                    (detail) => detail.shell === shellIndex && detail.element === selectedElement
-                ).length;
-
-                if (shellEnergies[shellIndex] && shellEnergies[shellIndex][removedFromShell]) {
-                    return shellEnergies[shellIndex][removedFromShell];
-                }
-
-                return Math.max(...elements[selectedElement].sequentialIonizationEnergies) * 1.2;
-            };
-
-            // Reset simulation
-            const resetSimulation = () => {
-                setActiveDragIndex(null);
-                setDragPosition({ x: 0, y: 0 });
-                setDragStartPosition({ x: 0, y: 0 });
-                setEnergyValue(0);
-                setResetKey((prev) => prev + 1);
-                setCompletedIonizations([]);
-                setIsDragging(false);
-                setCurrentDraggedShell(null);
-
-                if (selectedElement) {
-                    const newShellElectronCounts = {};
-                    elements[selectedElement].shellConfiguration.forEach((count, index) => {
-                        newShellElectronCounts[index] = count;
-                    });
-                    setShellElectronCounts(newShellElectronCounts);
-                }
-
-                if (animationFrameRef.current) {
-                    cancelAnimationFrame(animationFrameRef.current);
-                }
-            };
-
-            // Handle element selection
-            const handleElementSelect = (element) => {
-                setSelectedElement(element);
-                setActiveDragIndex(null);
-                setDragPosition({ x: 0, y: 0 });
-                setDragStartPosition({ x: 0, y: 0 });
-                setEnergyValue(0);
-                setCompletedIonizations([]);
-                setIsDragging(false);
-                setCurrentDraggedShell(null);
-
-                const newShellElectronCounts = {};
-                elements[element].shellConfiguration.forEach((count, index) => {
-                    newShellElectronCounts[index] = count;
-                });
-                setShellElectronCounts(newShellElectronCounts);
-
-                setResetKey((prev) => prev + 1);
-
-                // Update max energy to accommodate all previous ionizations plus this element
-                const allEnergies = [
-                    ...ionizationDetails.map(d => d.energy),
-                    elements[element].sequentialIonizationEnergies[0]
-                ];
-                const maxEnergyFromAll = Math.max(...allEnergies);
-                setMaxEnergy(maxEnergyFromAll * 1.5);
-            };
-
-            // Toggle whether inner shell electrons can be removed
-            const toggleInnerShellRemoval = () => {
-                setAllowInnerShellRemoval(!allowInnerShellRemoval);
-                resetSimulation();
-            };
-
-            // Update electron positions based on current state
-            const updateElectronPositions = () => {
-                if (!selectedElement) return;
-
-                const newElectrons = [];
-                const shellConfig = elements[selectedElement].shellConfiguration;
-                const centerX = 200;
-                const centerY = 200;
-
-                for (let shellIndex = 0; shellIndex < shellConfig.length; shellIndex++) {
-                    const originalElectronCount = shellConfig[shellIndex];
-                    const currentElectronCount = shellElectronCounts[shellIndex] || 0;
-                    const shellRadius = 50 + shellIndex * 40;
-
-                    for (let i = 0; i < currentElectronCount; i++) {
-                        const angle = (i / originalElectronCount) * 2 * Math.PI;
-                        const x = centerX + shellRadius * Math.cos(angle);
-                        const y = centerY + shellRadius * Math.sin(angle);
-
-                        newElectrons.push({
-                            id: `${shellIndex}-${i}`,
-                            x,
-                            y,
-                            shellIndex,
-                            electronIndex: i,
-                            radius: 8,
-                            energy: getIonizationEnergy(shellIndex, i),
-                        });
-                    }
-                }
-
-                setElectrons(newElectrons);
-            };
-
-            // Handle canvas mouse down - check if an electron was clicked
-            const handleCanvasMouseDown = (event) => {
-                if (isDragging || !selectedElement) return;
-
-                const canvas = canvasRef.current;
-                const rect = canvas.getBoundingClientRect();
-                const mouseX = event.clientX - rect.left;
-                const mouseY = event.clientY - rect.top;
-
-                for (const electron of electrons) {
-                    const dx = mouseX - electron.x;
-                    const dy = mouseY - electron.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    if (distance <= electron.radius) {
-                        startDrag(
-                            electron.shellIndex,
-                            electron.electronIndex,
-                            electron.x,
-                            electron.y,
-                            electron.energy
-                        );
-                        break;
-                    }
-                }
-            };
-
-            // Start dragging an electron
-            const startDrag = (shellIndex, electronIndex, startX, startY, energy) => {
-                if (!selectedElement) return;
-
-                if (!allowInnerShellRemoval) {
-                    const shellConfig = elements[selectedElement].shellConfiguration;
-                    const lastShellIndex = shellConfig.length - 1;
-
-                    if (shellIndex !== lastShellIndex && shellElectronCounts[lastShellIndex] > 0) {
-                        return;
-                    }
-                }
-
-                setIsDragging(true);
-                setActiveDragIndex(`${shellIndex}-${electronIndex}`);
-                setDragStartPosition({ x: startX, y: startY });
-                setDragPosition({ x: startX, y: startY });
-
-                const totalShells = elements[selectedElement].shellConfiguration.length;
-                const shellName = getShellName(shellIndex, totalShells);
-                setCurrentDraggedShell(shellName);
-
-                setEnergyValue(0);
-            };
-
-            // Continue dragging
-            const handleMouseMove = (event) => {
-                if (!isDragging || activeDragIndex === null || !selectedElement) return;
-
-                const canvas = canvasRef.current;
-                if (!canvas) return;
-
-                const rect = canvas.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                const y = event.clientY - rect.top;
-
-                setDragPosition({ x, y });
-
-                const dx = x - dragStartPosition.x;
-                const dy = y - dragStartPosition.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-
-                const [shellIndex, electronIndex] = activeDragIndex.split("-").map(Number);
-                const targetEnergy = getIonizationEnergy(shellIndex, electronIndex);
-
-                const shellConfig = elements[selectedElement].shellConfiguration;
-                const totalShells = shellConfig.length;
-
-                const shellDistanceScale = 1 + (totalShells - shellIndex - 1) * 0.75;
-                const maxDistance = 150 * shellDistanceScale;
-
-                let energyLevel = 0;
-                if (distance < maxDistance) {
-                    const normalizedDistance = distance / maxDistance;
-                    energyLevel = targetEnergy * Math.pow(normalizedDistance, 1.5);
-                } else {
-                    energyLevel = targetEnergy;
-                }
-
-                setEnergyValue(Math.min(energyLevel, targetEnergy));
-
-                const ionizationThreshold = 180 * shellDistanceScale;
-                if (distance > ionizationThreshold) {
-                    completeIonization(targetEnergy);
-                }
-            };
-
-            // End dragging
-            const handleMouseUp = () => {
-                if (!isDragging || !selectedElement) return;
-
-                const [shellIndex, electronIndex] = activeDragIndex.split("-").map(Number);
-                const targetEnergy = getIonizationEnergy(shellIndex, electronIndex);
-
-                if (energyValue < targetEnergy * 0.8) {
-                    animateElectronReturn();
-                } else {
-                    completeIonization(targetEnergy);
-                }
-            };
-
-            // Animate electron returning to its position
-            const animateElectronReturn = () => {
-                const startTime = performance.now();
-                const startX = dragPosition.x;
-                const startY = dragPosition.y;
-                const endX = dragStartPosition.x;
-                const endY = dragStartPosition.y;
-                const duration = 500;
-
-                const animate = (currentTime) => {
-                    const elapsed = currentTime - startTime;
-                    const progress = Math.min(elapsed / duration, 1);
-
-                    const easeProgress = 1 - Math.pow(1 - progress, 3);
-
-                    const x = startX + (endX - startX) * easeProgress;
-                    const y = startY + (endY - startY) * easeProgress;
-
-                    setDragPosition({ x, y });
-                    setEnergyValue(energyValue * (1 - easeProgress));
-
-                    if (progress < 1) {
-                        animationFrameRef.current = requestAnimationFrame(animate);
-                    } else {
-                        setActiveDragIndex(null);
-                        setIsDragging(false);
-                        setEnergyValue(0);
-                        setCurrentDraggedShell(null);
-                    }
-                };
-
-                animationFrameRef.current = requestAnimationFrame(animate);
-            };
-
-            // Complete ionization process
-            const completeIonization = (actualEnergy) => {
-                if (activeDragIndex === null || !selectedElement) return;
-
-                const [shellIndex, electronIndex] = activeDragIndex.split("-").map(Number);
-
-                const totalShells = elements[selectedElement].shellConfiguration.length;
-                const shellName = getShellName(shellIndex, totalShells);
-
-                const removedFromShell = ionizationDetails.filter(
-                    (detail) => detail.shell === shellIndex && detail.element === selectedElement
-                ).length;
-
-                const newShellElectronCounts = { ...shellElectronCounts };
-                newShellElectronCounts[shellIndex] = (newShellElectronCounts[shellIndex] || 0) - 1;
-                setShellElectronCounts(newShellElectronCounts);
-
-                setCompletedIonizations([...completedIonizations, activeDragIndex]);
-
-                const newDetail = {
-                    electron: activeDragIndex,
-                    shell: shellIndex,
-                    shellName,
-                    electronNumber: electronIndex + 1,
-                    removeNumber: removedFromShell + 1,
-                    energy: actualEnergy,
-                    element: selectedElement,
-                };
-
-                const newIonizationDetails = [...ionizationDetails, newDetail];
-                setIonizationDetails(newIonizationDetails);
-
-                setEnergyValue(actualEnergy);
-
-                const allEnergies = [...ionizationDetails.map((d) => d.energy), actualEnergy];
-
-                const shellsWithIonizations = new Set([
-                    ...ionizationDetails.map((d) => d.shellName),
-                    shellName,
-                ]);
-
-                let newMaxEnergy;
-
-                if (shellsWithIonizations.has("Inner Shell")) {
-                    const innerShellEnergies = [
-                        ...ionizationDetails
-                            .filter((d) => d.shellName === "Inner Shell")
-                            .map((d) => d.energy),
-                        shellName === "Inner Shell" ? actualEnergy : 0,
-                    ].filter((e) => e > 0);
-
-                    if (innerShellEnergies.length > 0) {
-                        newMaxEnergy = Math.max(...innerShellEnergies) * 1.2;
-                    } else {
-                        newMaxEnergy = Math.max(...allEnergies) * 1.5;
-                    }
-                } else if (shellsWithIonizations.has("Middle Shell")) {
-                    const middleShellEnergies = [
-                        ...ionizationDetails
-                            .filter((d) => d.shellName === "Middle Shell")
-                            .map((d) => d.energy),
-                        shellName === "Middle Shell" ? actualEnergy : 0,
-                    ].filter((e) => e > 0);
-
-                    if (middleShellEnergies.length > 0) {
-                        newMaxEnergy = Math.max(...middleShellEnergies) * 1.5;
-                    } else {
-                        newMaxEnergy = Math.max(...allEnergies) * 1.5;
-                    }
-                } else {
-                    newMaxEnergy = Math.max(...allEnergies) * 2;
-                }
-
-                setMaxEnergy(newMaxEnergy);
-
-                setActiveDragIndex(null);
-                setIsDragging(false);
-                setCurrentDraggedShell(null);
-
-                updateElectronPositions();
-            };
-
-            // Effects
-            useEffect(() => {
-                updateElectronPositions();
-            }, [selectedElement, shellElectronCounts, resetKey]);
-
-            useEffect(() => {
-                updateElectronPositions();
-            }, [selectedElement]);
-
-            // Canvas drawing effect
-            useEffect(() => {
-                const canvas = canvasRef.current;
-                if (!canvas || !selectedElement) return;
-
-                const ctx = canvas.getContext("2d");
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                const centerX = canvas.width / 2;
-                const centerY = canvas.height / 2;
-                const nucleusRadius = 20;
-
-                // Draw nucleus
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, nucleusRadius, 0, 2 * Math.PI);
-                ctx.fillStyle = "#000000"; // Black nucleus for all elements
-                ctx.fill();
-
-                // Draw element symbol in nucleus
-                ctx.fillStyle = "white";
-                ctx.font = "16px Poppins";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText(selectedElement, centerX, centerY);
-
-                // Draw electron shells
-                const shellConfig = elements[selectedElement].shellConfiguration;
-
-                shellConfig.forEach((electronCount, shellIndex) => {
-                    const shellRadius = 50 + shellIndex * 40;
-
-                    // Draw shell circle
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, shellRadius, 0, 2 * Math.PI);
-                    ctx.strokeStyle = "#aaaaaa";
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-
-                    // Add electron count
-                    const currentCount = shellElectronCounts[shellIndex] || 0;
-                    if (currentCount > 0) {
-                        ctx.fillStyle = "rgba(0,0,0,0.5)";
-                        ctx.font = "9px Poppins";
-                        ctx.fillText(
-                            `${currentCount}e⁻`,
-                            centerX - shellRadius + 10,
-                            centerY + 15
-                        );
-                    }
-                });
-
-                // Draw electrons
-                electrons.forEach((electron) => {
-                    if (electron.id === activeDragIndex) return;
-
-                    ctx.beginPath();
-                    ctx.arc(electron.x, electron.y, electron.radius, 0, 2 * Math.PI);
-                    ctx.fillStyle = "#3498db";
-                    ctx.fill();
-
-                    ctx.fillStyle = "white";
-                    ctx.font = "9px Poppins";
-                    ctx.fillText("e⁻", electron.x, electron.y);
-                });
-
-                // Draw dragged electron if any
-                if (isDragging && activeDragIndex !== null) {
-                    const x = dragPosition.x;
-                    const y = dragPosition.y;
-
-                    // Draw electron
-                    ctx.beginPath();
-                    ctx.arc(x, y, 8, 0, 2 * Math.PI);
-                    ctx.fillStyle = "#000000";
-                    ctx.fill();
-
-                    // Draw force line
-                    ctx.beginPath();
-                    ctx.moveTo(centerX, centerY);
-                    ctx.lineTo(x, y);
-                    ctx.strokeStyle = "#e74c3c";
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-
-                    // Draw electron label
-                    ctx.fillStyle = "white";
-                    ctx.font = "9px Poppins";
-                    ctx.fillText("e⁻", x, y);
-                }
-            }, [
-                electrons,
-                activeDragIndex,
-                dragPosition,
-                isDragging,
-                shellElectronCounts,
-                selectedElement,
-            ]);
-
-            // Mouse event listeners
-            useEffect(() => {
-                const handleGlobalMouseMove = (event) => {
-                    handleMouseMove(event);
-                };
-
-                const handleGlobalMouseUp = () => {
-                    handleMouseUp();
-                };
-
-                if (isDragging) {
-                    window.addEventListener("mousemove", handleGlobalMouseMove);
-                    window.addEventListener("mouseup", handleGlobalMouseUp);
-                }
-
-                return () => {
-                    window.removeEventListener("mousemove", handleGlobalMouseMove);
-                    window.removeEventListener("mouseup", handleGlobalMouseUp);
-                };
-            }, [isDragging, activeDragIndex, energyValue, dragStartPosition]);
-
-            // Initialize with Lithium
-            useEffect(() => {
-                handleElementSelect("Li");
-            }, []);
-
-            // Cleanup
-            useEffect(() => {
-                return () => {
-                    if (animationFrameRef.current) {
-                        cancelAnimationFrame(animationFrameRef.current);
-                    }
-                };
-            }, []);
-
-            // Don't render until element is selected
-            if (!selectedElement) {
-                return React.createElement('div', null, 'Loading...');
-            }
-
-            return React.createElement('div', {
-                style: {
-                    fontFamily: "Poppins, sans-serif",
-                    fontWeight: 400,
-                    padding: "20px",
-                    maxWidth: "1000px",
-                    margin: "0 auto",
-                }
-            }, [
-               
-                React.createElement('p', {
-                    key: 'description',
-                    style: { marginBottom: "15px" }
-                }, 'Drag electrons away from the atom to see how much energy is required to remove them.'),
-
-                // Element selector
-                React.createElement('div', {
-                    key: 'element-selector',
-                    style: { marginBottom: "20px" }
-                }, [
-                    React.createElement('h2', {
-                        key: 'selector-title',
-                        style: { fontSize: "18px", fontWeight: 600, marginBottom: "10px" }
-                    }, 'Select Element:'),
-                    
-                    React.createElement('div', {
-                        key: 'element-buttons',
-                        style: {
-                            display: "flex",
-                            gap: "10px",
-                            flexWrap: "wrap",
-                            marginBottom: "10px",
-                        }
-                    }, Object.keys(elements).map((element) =>
-                        React.createElement('button', {
-                            key: element,
-                            style: {
-                                padding: "6px 12px",
-                                borderRadius: "4px",
-                                border: "none",
-                                cursor: "pointer",
-                                backgroundColor: selectedElement === element ? "#3498db" : "#f0f0f0",
-                                color: selectedElement === element ? "white" : "black",
-                                fontFamily: "'Poppins', sans-serif",
-                                fontWeight: 600,
-                                fontSize: "12px",
-                            },
-                            onClick: () => handleElementSelect(element)
-                        }, `${element} - ${elements[element].name}`)
-                    )),
-
-                    // Inner shell removal toggle
-                    React.createElement('div', {
-                        key: 'toggle-container'
-                    }, 
-                        React.createElement('label', {
-                            style: { display: "flex", alignItems: "center", cursor: "pointer" }
-                        }, [
-                            React.createElement('input', {
-                                key: 'checkbox',
-                                type: "checkbox",
-                                checked: allowInnerShellRemoval,
-                                onChange: toggleInnerShellRemoval,
-                                style: { marginRight: "8px" }
-                            }),
-                            'Allow inner shell electron removal'
-                        ])
-                    )
-                ]),
-
-                // Main simulation container
-                React.createElement('div', {
-                    key: 'main-container',
-                    style: {
-                        border: "1px solid #e0e0e0",
-                        borderRadius: "8px",
-                        padding: "20px",
-                        backgroundColor: "#f9f9f9",
-                        display: "flex",
-                        flexDirection: "column",
-                    }
-                }, [
-                    React.createElement('h2', {
-                        key: 'element-title',
-                        style: { fontSize: "18px", fontWeight: "bold", marginBottom: "10px" }
-                    }, `${elements[selectedElement].name} (${selectedElement})`),
-                    
-                    React.createElement('p', {
-                        key: 'element-info',
-                        style: { fontSize: "14px", marginBottom: "10px" }
-                    }, `Atomic Number: ${elements[selectedElement].atomicNumber} | Electrons: ${Object.values(shellElectronCounts).reduce((sum, count) => sum + count, 0)} | Ionizations: ${completedIonizations.length}`),
-
-                    React.createElement('div', {
-                        key: 'simulation-area',
-                        style: {
-                            position: "relative",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "20px",
-                            width: "100%",
-                        }
-                    }, [
-                        // Top row with atom and current energy bar
-                        React.createElement('div', {
-                            key: 'top-row',
-                            style: {
-                                display: "flex",
-                                alignItems: "flex-start",
-                                gap: "20px",
-                            }
-                        }, [
-                            // Atom canvas
-                            React.createElement('div', {
-                                key: 'canvas-container'
-                            }, [
-                                React.createElement('canvas', {
-                                    key: 'canvas',
-                                    ref: canvasRef,
-                                    width: "400",
-                                    height: "400",
-                                    style: {
-                                        border: "1px solid #e0e0e0",
-                                        borderRadius: "4px",
-                                        backgroundColor: "white",
-                                        cursor: "pointer",
-                                    },
-                                    onMouseDown: handleCanvasMouseDown
-                                }),
-
-                                // Instructions
-                                React.createElement('div', {
-                                    key: 'instructions',
-                                    style: {
-                                        position: "absolute",
-                                        top: "10px",
-                                        left: "10px",
-                                        backgroundColor: "rgba(255, 255, 255, 0.7)",
-                                        padding: "8px",
-                                        borderRadius: "4px",
-                                        fontSize: "12.5px",
-                                    }
-                                }, 'Click and drag an electron away from the atom to ionize it.')
-                            ]),
-
-                            // Current energy meter
-                            React.createElement('div', {
-                                key: 'energy-meter',
-                                style: {
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                }
-                            }, [
-                                React.createElement('div', {
-                                    key: 'energy-title',
-                                    style: {
-                                        fontSize: "14px",
-                                        fontWeight: "500",
-                                        marginBottom: "8px",
-                                    }
-                                }, 'Current Energy'),
-
-                                energyValue > 0 && React.createElement('div', {
-                                    key: 'energy-value',
-                                    style: {
-                                        marginBottom: "8px",
-                                        padding: "4px 8px",
-                                        borderRadius: "4px",
-                                        border: "1px solid #e0e0e0",
-                                        minWidth: "80px",
-                                        textAlign: "center",
-                                        background: currentDraggedShell
-                                            ? `linear-gradient(to right, ${shellColors[currentDraggedShell][0]}, ${shellColors[currentDraggedShell][1]})`
-                                            : "linear-gradient(to right, #ff9800, #ffcc80)",
-                                    }
-                                }, 
-                                    React.createElement('span', {
-                                        style: {
-                                            fontSize: "12px",
-                                            fontWeight: "bold",
-                                            color: "white",
-                                        }
-                                    }, `${Math.round(energyValue)} kJ/mol`)
-                                ),
-
-                                React.createElement('div', {
-                                    key: 'energy-meter-bar',
-                                    style: {
-                                        width: "64px",
-                                        height: "256px",
-                                        border: "1px solid #e0e0e0",
-                                        borderRadius: "4px",
-                                        background: "linear-gradient(to top, #f0f8ff, #fff0f0)",
-                                        position: "relative",
-                                        overflow: "hidden",
-                                    }
-                                }, [
-                                    React.createElement('div', {
-                                        key: 'meter-labels',
-                                        style: {
-                                            position: "absolute",
-                                            inset: "0",
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            justifyContent: "space-between",
-                                            pointerEvents: "none",
-                                            padding: "4px",
-                                        }
-                                    }, [
-                                        React.createElement('span', {
-                                            key: 'high-label',
-                                            style: { fontSize: "12px", color: "#666" }
-                                        }, 'high'),
-                                        React.createElement('span', {
-                                            key: 'low-label',
-                                            style: { fontSize: "12px", color: "#666" }
-                                        }, 'low')
-                                    ]),
-
-                                    React.createElement('div', {
-                                        key: 'meter-fill',
-                                        style: {
-                                            position: "absolute",
-                                            bottom: "0",
-                                            left: "0",
-                                            right: "0",
-                                            background: currentDraggedShell
-                                                ? `linear-gradient(to top, ${shellColors[currentDraggedShell][0]}, ${shellColors[currentDraggedShell][1]})`
-                                                : "linear-gradient(to top, #ff9800, #ffcc80)",
-                                            transition: "height 0.1s",
-                                            height: `${getEnergyMeterHeight(energyValue)}%`,
-                                            maxHeight: "100%",
-                                        }
-                                    })
-                                ])
-                            ])
-                        ]),
-
-                        // Bottom row with ionization energy bars
-                        React.createElement('div', {
-                            key: 'bottom-row',
-                            style: {
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                width: "100%",
-                                marginTop: "30px",
-                            }
-                        }, [
-                            // Reset Current Element button (moved here)
-                            React.createElement('button', {
-                                key: 'reset-element-btn',
-                                style: {
-                                    padding: "8px 16px",
-                                    backgroundColor: "#3498db",
-                                    color: "white",
-                                    border: "none",
-                                    borderRadius: "4px",
-                                    cursor: "pointer",
-                                    marginBottom: "16px",
-                                    fontSize: "12px",
-                                },
-                                onClick: resetSimulation
-                            }, 'Reset Current Element'),
-
-                            React.createElement('div', {
-                                style: {
-                                    display: "flex",
-                                    gap: "32px",
-                                    alignItems: "left",
-                                    height: "450px",
-                                    justifyContent: "left",
-                                    margin: "0 auto",
-                                    width: "fit-content",
-                                    flexWrap: "wrap",
-                                    maxWidth: "800px",
-                                }
-                            }, ionizationDetails.slice(-8).map((detail, idx) => {
-                                const ionizationEnergy = detail.energy;
-                                const shellColor = shellColors[detail.shellName] || ["#9e9e9e", "#bdbdbd"];
-                                const heightPercentage = getEnergyMeterHeight(ionizationEnergy);
-
-                                return React.createElement('div', {
-                                    key: `ie-${idx}`,
-                                    style: {
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                    }
-                                }, [
-                                    // Energy value at the top
-                                    React.createElement('div', {
-                                        key: 'energy-val',
-                                        style: {
-                                            marginBottom: "8px",
-                                            padding: "4px 8px",
-                                            borderRadius: "4px",
-                                            border: "1px solid #e0e0e0",
-                                            minWidth: "64px",
-                                            textAlign: "center",
-                                            background: `linear-gradient(to right, ${shellColor[0]}, ${shellColor[1]})`,
-                                        }
-                                    }, 
-                                        React.createElement('span', {
-                                            style: {
-                                                fontSize: "12px",
-                                                fontWeight: "bold",
-                                                color: "white",
-                                            }
-                                        }, `${Math.round(ionizationEnergy)} kJ/mol`)
-                                    ),
-
-                                    React.createElement('div', {
-                                        key: 'bar-container',
-                                        style: {
-                                            width: "64px",
-                                            height: "256px",
-                                            border: "1px solid #e0e0e0",
-                                            borderRadius: "4px",
-                                            backgroundColor: "#f9f9f9",
-                                            position: "relative",
-                                            overflow: "hidden",
-                                        }
-                                    }, 
-                                        React.createElement('div', {
-                                            style: {
-                                                position: "absolute",
-                                                bottom: "0",
-                                                left: "0",
-                                                right: "0",
-                                                background: `linear-gradient(to top, ${shellColor[0]}, ${shellColor[1]})`,
-                                                height: `${heightPercentage}%`,
-                                                maxHeight: "100%",
-                                            }
-                                        })
-                                    ),
-                                    
-                                    React.createElement('div', {
-                                        key: 'shell-name',
-                                        style: {
-                                            fontSize: "13px",
-                                            fontWeight: "500",
-                                            marginTop: "6px",
-                                        }
-                                    }, detail.shellName),
-
-                                    React.createElement('div', {
-                                        key: 'element-name',
-                                        style: {
-                                            fontSize: "12px",
-                                            fontWeight: "600",
-                                            marginTop: "2px",
-                                            color: "#000000",
-                                        }
-                                    }, detail.element)
-                                ]);
-                            }))
-                        ])
-                    ]),
-
-                    React.createElement('div', {
-                        key: 'reset-button-container',
-                        style: {
-                            display: "flex",
-                            justifyContent: "center",
-                            marginTop: "-20px",
-                        }
-                    }, 
-                        ionizationDetails.length > 0 && React.createElement('button', {
-                            style: {
-                                padding: "8px 16px",
-                                backgroundColor: "#e74c3c",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "4px",
-                                cursor: "pointer",
-                            },
-                            onClick: () => setIonizationDetails([])
-                        }, 'Clear All Comparisons')
-                    )
-                ]),
-
-                // Ionization energy values
-                React.createElement('div', {
-                    key: 'ionization-details',
-                    style: {
-                        marginTop: "16px",
-                        border: "1px solid #e0e0e0",
-                        borderRadius: "8px",
-                        padding: "20px",
-                        backgroundColor: "#f9f9f9",
-                    }
-                }, 
-                    React.createElement('div', {
-                        style: {
-                            display: "grid",
-                            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-                            gap: "8px",
-                        }
-                    }, ionizationDetails.map((detail, idx) => {
-                        const shellColor = shellColors[detail.shellName] || ["#9e9e9e", "#bdbdbd"];
-
-                        return React.createElement('div', {
-                            key: `ie-detail-${idx}`,
-                            style: {
-                                padding: "8px",
-                                borderRadius: "4px",
-                                border: `2px solid ${shellColor[0]}`,
-                                backgroundColor: "#f5f5f5",
-                            }
-                        }, [
-                            React.createElement('div', {
-                                key: 'element-header',
-                                style: {
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    marginBottom: "4px",
-                                }
-                            }, [
-                                React.createElement('span', {
-                                    key: 'shell-name',
-                                    style: {
-                                        fontWeight: "500",
-                                        fontSize: "14px",
-                                        color: shellColor[0],
-                                    }
-                                }, detail.shellName),
-                                
-                                React.createElement('span', {
-                                    key: 'element-symbol',
-                                    style: {
-                                        fontWeight: "600",
-                                        fontSize: "13px",
-                                        color: "#000000",
-                                        backgroundColor: "rgba(255,255,255,0.8)",
-                                        padding: "2px 6px",
-                                        borderRadius: "3px",
-                                    }
-                                }, detail.element)
-                            ]),
-                            
-                            React.createElement('div', {
-                                key: 'electron-info',
-                                style: { fontSize: "13px" }
-                            }, `Electron #${detail.removeNumber} from shell`),
-                            
-                            React.createElement('div', {
-                                key: 'energy-info',
-                                style: {
-                                    fontSize: "13px",
-                                    marginTop: "2px",
-                                    fontWeight: "500",
-                                }
-                            }, `${detail.energy} kJ/mol`)
-                        ]);
-                    }))
-                )
-            ]);
+      }
+      wiggleIntensity = directionChanges / (newMouseHistory.length - 3);
+    }
+
+    if (activeTab === "chemical") {
+      const [shellIndex, electronIndex] = activeDragIndex.split("-").map(Number);
+      const targetEnergy = getIonizationEnergy(shellIndex, electronIndex);
+
+      const shellConfig = elements[selectedElement].shellConfiguration;
+      const totalShells = shellConfig.length;
+      const shellDistanceScale = 1 + (totalShells - shellIndex - 1) * 0.75;
+      const maxDistance = 150 * shellDistanceScale;
+
+      let energyLevel = 0;
+      if (distance < maxDistance) {
+        const normalizedDistance = distance / maxDistance;
+        energyLevel = targetEnergy * Math.pow(normalizedDistance, 1.5);
+      } else {
+        energyLevel = targetEnergy;
+      }
+
+      setEnergyValue(Math.min(energyLevel, targetEnergy));
+
+      const ionizationThreshold = 180 * shellDistanceScale;
+      if (distance > ionizationThreshold) {
+        completeIonization(targetEnergy);
+      }
+    } else if (activeTab === "nuclear") {
+      // Check if dragging a nuclear particle or electron
+      if (activeDragIndex.includes('proton') || activeDragIndex.includes('neutron')) {
+        // Nuclear particle dragging - REQUIRES VIGOROUS WIGGLING!
+        const nucleonType = activeDragIndex.includes('proton') ? 'proton' : 'neutron';
+        const targetEnergy = nuclearBindingEnergies[nucleonType];
+
+        const maxDistance = 350; // Slightly reduced
+        const nuclearThreshold = 400; // Slightly reduced
+
+        // Energy only builds up with wiggling + distance
+        let baseEnergyFromDistance = 0;
+        if (distance < maxDistance) {
+          const normalizedDistance = distance / maxDistance;
+          baseEnergyFromDistance = targetEnergy * Math.pow(normalizedDistance, 2.5); // Less steep
+        } else {
+          baseEnergyFromDistance = targetEnergy;
         }
 
-        // Render the app
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
-    </script>
-</body>
-</html>
+        // Wiggle requirement - energy is multiplied by wiggle intensity
+        const wiggleMultiplier = Math.min(wiggleIntensity * 5 + 0.3, 1); // Easier wiggle bonus, minimum 30%
+        const finalEnergy = baseEnergyFromDistance * wiggleMultiplier;
+
+        setEnergyValue(Math.min(finalEnergy, targetEnergy));
+        setWiggleEnergy(wiggleIntensity);
+
+        // Reduced thresholds
+        if (distance > nuclearThreshold && wiggleIntensity > 0.15) { // Much lower wiggle requirement
+          completeNuclearRemoval(targetEnergy, nucleonType);
+        }
+      } else {
+        // Electron dragging in nuclear view (same as chemical)
+        const [shellIndex, electronIndex] = activeDragIndex.split("-").map(Number);
+        const targetEnergy = getIonizationEnergy(shellIndex, electronIndex);
+
+        const shellConfig = elements[selectedElement].shellConfiguration;
+        const totalShells = shellConfig.length;
+        const shellDistanceScale = 1 + (totalShells - shellIndex - 1) * 0.75;
+        const maxDistance = 150 * shellDistanceScale;
+
+        let energyLevel = 0;
+        if (distance < maxDistance) {
+          const normalizedDistance = distance / maxDistance;
+          energyLevel = targetEnergy * Math.pow(normalizedDistance, 1.5);
+        } else {
+          energyLevel = targetEnergy;
+        }
+
+        setEnergyValue(Math.min(energyLevel, targetEnergy));
+
+        const ionizationThreshold = 180 * shellDistanceScale;
+        if (distance > ionizationThreshold) {
+          completeIonization(targetEnergy);
+        }
+      }
+    }
+  };
+
+  // End dragging
+  const handleMouseUp = () => {
+    if (!isDragging || !selectedElement) return;
+
+    if (activeTab === "chemical") {
+      const [shellIndex, electronIndex] = activeDragIndex.split("-").map(Number);
+      const targetEnergy = getIonizationEnergy(shellIndex, electronIndex);
+
+      if (energyValue < targetEnergy * 0.8) {
+        animateElectronReturn();
+      } else {
+        completeIonization(targetEnergy);
+      }
+    } else if (activeTab === "nuclear") {
+      // Check if releasing a nuclear particle or electron
+      if (activeDragIndex.includes('proton') || activeDragIndex.includes('neutron')) {
+        // Nuclear particle handling - needs wiggling AND energy
+        const nucleonType = activeDragIndex.includes('proton') ? 'proton' : 'neutron';
+        const targetEnergy = nuclearBindingEnergies[nucleonType];
+
+        if (energyValue < targetEnergy * 0.7 || wiggleEnergy < 0.1) { // Much more forgiving
+          animateElectronReturn();
+        } else {
+          completeNuclearRemoval(targetEnergy, nucleonType);
+        }
+      } else {
+        // Electron handling (same as chemical)
+        const [shellIndex, electronIndex] = activeDragIndex.split("-").map(Number);
+        const targetEnergy = getIonizationEnergy(shellIndex, electronIndex);
+
+        if (energyValue < targetEnergy * 0.8) {
+          animateElectronReturn();
+        } else {
+          completeIonization(targetEnergy);
+        }
+      }
+    }
+  };
+
+  // Animate electron returning to its position
+  const animateElectronReturn = () => {
+    const startTime = performance.now();
+    const startX = dragPosition.x;
+    const startY = dragPosition.y;
+    const endX = dragStartPosition.x;
+    const endY = dragStartPosition.y;
+    const duration = 500;
+
+    const animate = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+      const x = startX + (endX - startX) * easeProgress;
+      const y = startY + (endY - startY) * easeProgress;
+
+      setDragPosition({ x, y });
+      setEnergyValue(energyValue * (1 - easeProgress));
+
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        setActiveDragIndex(null);
+        setIsDragging(false);
+        setEnergyValue(0);
+        setCurrentDraggedShell(null);
+        // Reset wiggling state
+        setMouseHistory([]);
+        setWiggleEnergy(0);
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+  };
+
+  // Complete ionization process
+  const completeIonization = (actualEnergy) => {
+    if (activeDragIndex === null || !selectedElement) return;
+
+    const [shellIndex, electronIndex] = activeDragIndex.split("-").map(Number);
+
+    const totalShells = elements[selectedElement].shellConfiguration.length;
+    const shellName = getShellName(shellIndex, totalShells);
+
+    const removedFromShell = ionizationDetails.filter(
+      (detail) => detail.shell === shellIndex
+    ).length;
+
+    const newShellElectronCounts = { ...shellElectronCounts };
+    newShellElectronCounts[shellIndex] = (newShellElectronCounts[shellIndex] || 0) - 1;
+    setShellElectronCounts(newShellElectronCounts);
+
+    setCompletedIonizations([...completedIonizations, activeDragIndex]);
+
+    const newDetail = {
+      electron: activeDragIndex,
+      shell: shellIndex,
+      shellName,
+      electronNumber: electronIndex + 1,
+      removeNumber: removedFromShell + 1,
+      energy: actualEnergy,
+    };
+
+    const newIonizationDetails = [...ionizationDetails, newDetail];
+    setIonizationDetails(newIonizationDetails);
+
+    setEnergyValue(actualEnergy);
+
+    const allEnergies = [...ionizationDetails.map((d) => d.energy), actualEnergy];
+    const shellsWithIonizations = new Set([
+      ...ionizationDetails.map((d) => d.shellName),
+      shellName,
+    ]);
+
+    let newMaxEnergy;
+
+    if (shellsWithIonizations.has("Inner Shell")) {
+      const innerShellEnergies = [
+        ...ionizationDetails
+          .filter((d) => d.shellName === "Inner Shell")
+          .map((d) => d.energy),
+        shellName === "Inner Shell" ? actualEnergy : 0,
+      ].filter((e) => e > 0);
+
+      if (innerShellEnergies.length > 0) {
+        newMaxEnergy = Math.max(...innerShellEnergies) * 1.2;
+      } else {
+        newMaxEnergy = Math.max(...allEnergies) * 1.5;
+      }
+    } else if (shellsWithIonizations.has("Middle Shell")) {
+      const middleShellEnergies = [
+        ...ionizationDetails
+          .filter((d) => d.shellName === "Middle Shell")
+          .map((d) => d.energy),
+        shellName === "Middle Shell" ? actualEnergy : 0,
+      ].filter((e) => e > 0);
+
+      if (middleShellEnergies.length > 0) {
+        newMaxEnergy = Math.max(...middleShellEnergies) * 1.5;
+      } else {
+        newMaxEnergy = Math.max(...allEnergies) * 1.5;
+      }
+    } else {
+      newMaxEnergy = Math.max(...allEnergies) * 2;
+    }
+
+    setMaxEnergy(newMaxEnergy);
+
+    setActiveDragIndex(null);
+    setIsDragging(false);
+    setCurrentDraggedShell(null);
+
+    updateElectronPositions();
+  };
+
+  // Effects
+  useEffect(() => {
+    updateElectronPositions();
+  }, [selectedElement, shellElectronCounts, resetKey]);
+
+  useEffect(() => {
+    if (activeTab === "nuclear") {
+      updateNucleonPositions();
+    }
+  }, [activeTab, currentNucleus, resetKey]);
+
+  useEffect(() => {
+    updateElectronPositions();
+  }, [selectedElement]);
+
+  // Draw the actual canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !selectedElement) return;
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const nucleusRadius = 20;
+
+    if (activeTab === "chemical") {
+      // Draw nucleus
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, nucleusRadius, 0, 2 * Math.PI);
+      ctx.fillStyle = elements[selectedElement].color;
+      ctx.fill();
+
+      // Draw element symbol in nucleus
+      ctx.fillStyle = "white";
+      ctx.font = "16px Poppins";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(selectedElement, centerX, centerY);
+
+      // Draw electron shells
+      const shellConfig = elements[selectedElement].shellConfiguration;
+
+      shellConfig.forEach((electronCount, shellIndex) => {
+        const shellRadius = 50 + shellIndex * 40;
+
+        // Draw shell circle
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, shellRadius, 0, 2 * Math.PI);
+        ctx.strokeStyle = "#aaaaaa";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Removed electron count labels
+      });
+
+      // Draw electrons
+      electrons.forEach((electron) => {
+        if (electron.id === activeDragIndex) return;
+
+        ctx.beginPath();
+        ctx.arc(electron.x, electron.y, electron.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = "#3498db";
+        ctx.fill();
+
+        ctx.fillStyle = "white";
+        ctx.font = "9px Poppins";
+        ctx.fillText("e⁻", electron.x, electron.y);
+      });
+
+      // Draw dragged electron if any
+      if (isDragging && activeDragIndex !== null) {
+        const x = dragPosition.x;
+        const y = dragPosition.y;
+
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = "#000000";
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = "#e74c3c";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = "white";
+        ctx.font = "9px Poppins";
+        ctx.fillText("e⁻", x, y);
+      }
+    } else if (activeTab === "nuclear") {
+      // Nuclear view - draw nucleus with both electrons AND nucleons
+      
+      // Draw electron shells (same as chemical view)
+      const shellConfig = elements[selectedElement].shellConfiguration;
+
+      shellConfig.forEach((electronCount, shellIndex) => {
+        const shellRadius = 50 + shellIndex * 40;
+
+        // Draw shell circle
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, shellRadius, 0, 2 * Math.PI);
+        ctx.strokeStyle = "#aaaaaa";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Removed electron count labels
+      });
+
+      // Draw electrons
+      electrons.forEach((electron) => {
+        if (electron.id === activeDragIndex) return;
+
+        ctx.beginPath();
+        ctx.arc(electron.x, electron.y, electron.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = "#3498db";
+        ctx.fill();
+
+        ctx.fillStyle = "white";
+        ctx.font = "9px Poppins";
+        ctx.fillText("e⁻", electron.x, electron.y);
+      });
+
+      // Draw larger nucleus area - made smaller to match tighter packing
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 30, 0, 2 * Math.PI); // Reduced from 40 to 30
+      ctx.strokeStyle = "#666";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw nucleons
+      nucleons.forEach((nucleon) => {
+        if (nucleon.id === activeDragIndex) return;
+
+        ctx.beginPath();
+        ctx.arc(nucleon.x, nucleon.y, nucleon.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = nucleon.type === 'proton' ? "#666666" : "#000000";
+        ctx.fill();
+
+        ctx.fillStyle = "white";
+        ctx.font = "8px Poppins";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(nucleon.type === 'proton' ? "p" : "n", nucleon.x, nucleon.y);
+      });
+
+      // Draw dragged particle if any (electron or nucleon)
+      if (isDragging && activeDragIndex !== null) {
+        const x = dragPosition.x;
+        const y = dragPosition.y;
+
+        if (activeDragIndex.includes('proton') || activeDragIndex.includes('neutron')) {
+          // Nuclear particle
+          const isProton = activeDragIndex.includes('proton');
+
+          ctx.beginPath();
+          ctx.arc(x, y, 8, 0, 2 * Math.PI);
+          ctx.fillStyle = isProton ? "#666666" : "#000000";
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.lineTo(x, y);
+          ctx.strokeStyle = "#e74c3c";
+          ctx.lineWidth = 3;
+          ctx.stroke();
+
+          ctx.fillStyle = "white";
+          ctx.font = "8px Poppins";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(isProton ? "p" : "n", x, y);
+        } else {
+          // Electron
+          ctx.beginPath();
+          ctx.arc(x, y, 8, 0, 2 * Math.PI);
+          ctx.fillStyle = "#000000";
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.lineTo(x, y);
+          ctx.strokeStyle = "#e74c3c";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.fillStyle = "white";
+          ctx.font = "9px Poppins";
+          ctx.fillText("e⁻", x, y);
+        }
+      }
+
+      // Draw element information - removed specific labels
+      // (No text drawn here now)
+    }
+  }, [
+    electrons,
+    nucleons,
+    activeDragIndex,
+    dragPosition,
+    isDragging,
+    shellElectronCounts,
+    selectedElement,
+    activeTab,
+    currentNucleus,
+    wiggleEnergy,
+  ]);
+
+  // Set up event listeners for mouse movement and mouse up
+  useEffect(() => {
+    const handleGlobalMouseMove = (event) => {
+      handleMouseMove(event);
+    };
+
+    const handleGlobalMouseUp = () => {
+      handleMouseUp();
+    };
+
+    if (isDragging) {
+      window.addEventListener("mousemove", handleGlobalMouseMove);
+      window.addEventListener("mouseup", handleGlobalMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleGlobalMouseMove);
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [isDragging, activeDragIndex, energyValue, dragStartPosition, activeTab, wiggleEnergy]);
+
+  // Set initial element
+  useEffect(() => {
+    handleElementSelect("Li");
+  }, []);
+
+  // Clean up animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  // Don't render until element is selected
+  if (!selectedElement) {
+    return <div>Loading...</div>;
+  }
+
+  return (
+    <div className="font-['Poppins'] font-extrabold p-5 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-2">
+        Interactive Ionization Energy Simulation
+      </h1>
+      <p className="mb-4">
+        Drag electrons away from the atom to see how much energy is required to remove them.
+      </p>
+
+      {/* Tab selector */}
+      <div className="mb-5">
+        <div className="flex gap-0 mb-5">
+          <button
+            className={`px-5 py-2 border border-gray-300 font-['Poppins'] font-semibold text-sm cursor-pointer rounded-tl ${
+              activeTab === "chemical"
+                ? "border-b-2 border-b-blue-500 bg-gray-50"
+                : "border-b bg-white"
+            }`}
+            onClick={() => {
+              setActiveTab("chemical");
+              resetSimulation();
+            }}
+          >
+            Chemical (Electrons)
+          </button>
+          <button
+            className={`px-5 py-2 border border-gray-300 font-['Poppins'] font-semibold text-sm cursor-pointer rounded-tr ${
+              activeTab === "nuclear"
+                ? "border-b-2 border-b-blue-500 bg-gray-50"
+                : "border-b bg-white"
+            }`}
+            onClick={() => {
+              setActiveTab("nuclear");
+              resetSimulation();
+            }}
+          >
+            Comparing Subatomic Particles
+          </button>
+        </div>
+      </div>
+
+      {/* Chemical Tab Content */}
+      {activeTab === "chemical" && (
+        <div className="mb-5">
+          <h2 className="text-lg font-semibold mb-2">Select Element:</h2>
+          <div className="flex gap-2 flex-wrap mb-2">
+            {Object.keys(elements).map((element) => (
+              <button
+                key={element}
+                className={`px-3 py-1 rounded border-none cursor-pointer font-['Poppins'] font-bold text-xs ${
+                  selectedElement === element
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-black"
+                }`}
+                onClick={() => handleElementSelect(element)}
+              >
+                {element} - {elements[element].name}
+              </button>
+            ))}
+          </div>
+
+          <div>
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={allowInnerShellRemoval}
+                onChange={toggleInnerShellRemoval}
+                className="mr-2"
+              />
+              Allow inner shell electron removal
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Nuclear Tab Content */}
+      {activeTab === "nuclear" && (
+        <div className="mb-5">
+          <h2 className="text-lg font-semibold mb-2">Comparing Subatomic Particles</h2>
+          <p className="text-sm text-gray-600 mb-2">
+            Electrons: Drag to remove. Protons/neutrons: Drag AND wiggle your cursor back and forth to remove.
+          </p>
+        </div>
+      )}
+
+      <div className="border border-gray-200 rounded-lg p-5 bg-gray-50 flex flex-col">
+        <h2 className="text-lg font-bold mb-2">
+          {activeTab === "chemical" 
+            ? `${elements[selectedElement].name} (${selectedElement})`
+            : "Subatomic Particle Comparison"
+          }
+        </h2>
+        <p className="text-sm mb-2">
+          {activeTab === "chemical" ? (
+            <>
+              Atomic Number: {elements[selectedElement].atomicNumber} | Electrons:{" "}
+              {Object.values(shellElectronCounts).reduce((sum, count) => sum + count, 0)}{" "}
+              | Ionizations: {completedIonizations.length}
+            </>
+          ) : (
+            <>
+              Element: {currentNucleus.element} | Protons: {currentNucleus.protons} | Neutrons: {currentNucleus.neutrons} | Electrons:{" "}
+              {Object.values(shellElectronCounts).reduce((sum, count) => sum + count, 0)}{" "}
+              | {currentNucleus.protons === 3 && currentNucleus.neutrons === 4 ? "Stable" : "Unstable"}
+            </>
+          )}
+        </p>
+
+        <div className="flex flex-row items-start gap-8 flex-wrap">
+          <div className="relative flex flex-col gap-5 w-full">
+            {/* Top row with atom and current energy bar */}
+            <div className="flex items-start gap-5">
+              {/* Atom canvas */}
+              <div>
+                <canvas
+                  ref={canvasRef}
+                  width="400"
+                  height="400"
+                  className="border border-gray-200 rounded bg-white cursor-pointer"
+                  onMouseDown={handleCanvasMouseDown}
+                />
+
+                {/* Instructions */}
+                <div className="absolute top-2 left-2 bg-white/70 p-2 rounded text-xs">
+                  {activeTab === "chemical" 
+                    ? "Click and drag an electron away from the atom to ionize it."
+                    : "Electrons: drag normally. Protons/neutrons: drag AND move back and forth!"
+                  }
+                </div>
+              </div>
+
+              {/* Current energy meter */}
+              <div className="flex flex-col items-center">
+                <div className="text-sm font-medium mb-2">Current Energy</div>
+
+                {energyValue > 0 && (
+                  <div
+                    className="mb-2 px-2 py-1 rounded border border-gray-200 min-w-20 text-center"
+                    style={{
+                      background: currentDraggedShell
+                        ? (activeTab === "nuclear" 
+                            ? (currentDraggedShell === "Proton" ? "#666666" : "#000000")
+                            : `linear-gradient(to right, ${shellColors[currentDraggedShell][0]}, ${shellColors[currentDraggedShell][1]})`)
+                        : "linear-gradient(to right, #ff9800, #ffcc80)",
+                    }}
+                  >
+                    {activeTab === "chemical" && (
+                      <span className="text-xs font-bold text-white">
+                        {Math.round(energyValue)} kJ/mol
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div className="w-16 h-64 border border-gray-200 rounded bg-gradient-to-t from-blue-50 to-red-50 relative overflow-hidden">
+                  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none p-1">
+                    <span className="text-xs text-gray-600">high</span>
+                    <span className="text-xs text-gray-600">low</span>
+                  </div>
+
+                  <div
+                    className="absolute bottom-0 left-0 right-0 transition-all duration-100"
+                    style={{
+                      background: currentDraggedShell
+                        ? (activeTab === "nuclear" 
+                            ? (currentDraggedShell === "Proton" ? "#666666" : "#000000")
+                            : `linear-gradient(to top, ${shellColors[currentDraggedShell][0]}, ${shellColors[currentDraggedShell][1]})`)
+                        : "linear-gradient(to top, #ff9800, #ffcc80)",
+                      height: `${getEnergyMeterHeight(energyValue)}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom row with ionization/nuclear energy bars */}
+            <div className="flex flex-col items-center w-full mt-15">
+              <div className="flex gap-5 items-start h-64 justify-center mx-auto w-fit">
+                {/* Display energy meters based on active tab */}
+                {activeTab === "chemical" && ionizationDetails.slice(-3).map((detail, idx) => {
+                  const ionizationEnergy = detail.energy;
+                  const shellColor = shellColors[detail.shellName] || ["#9e9e9e", "#bdbdbd"];
+                  const heightPercentage = getEnergyMeterHeight(ionizationEnergy);
+
+                  return (
+                    <div key={`ie-${idx}`} className="flex flex-col items-center">
+                      <div
+                        className="mb-2 px-2 py-1 rounded border border-gray-200 min-w-16 text-center"
+                        style={{
+                          background: `linear-gradient(to right, ${shellColor[0]}, ${shellColor[1]})`,
+                        }}
+                      >
+                        <span className="text-xs font-bold text-white">
+                          {Math.round(ionizationEnergy)} kJ/mol
+                        </span>
+                      </div>
+
+                      <div className="w-16 h-64 border border-gray-200 rounded bg-gray-50 relative overflow-hidden">
+                        <div
+                          className="absolute bottom-0 left-0 right-0"
+                          style={{
+                            background: `linear-gradient(to top, ${shellColor[0]}, ${shellColor[1]})`,
+                            height: `${heightPercentage}%`,
+                          }}
+                        ></div>
+                      </div>
+                      <div className="text-sm font-medium mt-2">{detail.shellName}</div>
+                    </div>
+                  );
+                })}
+
+                {activeTab === "nuclear" && [
+                  ...ionizationDetails.slice(-2).map((detail, idx) => {
+                    const ionizationEnergy = detail.energy;
+                    const shellColor = shellColors[detail.shellName] || ["#9e9e9e", "#bdbdbd"];
+                    const heightPercentage = getEnergyMeterHeight(ionizationEnergy);
+
+                    return (
+                      <div key={`ie-${idx}`} className="flex flex-col items-center">
+                        <div
+                          className="mb-2 px-2 py-1 rounded border border-gray-200 min-w-16 text-center"
+                          style={{
+                            background: `linear-gradient(to right, ${shellColor[0]}, ${shellColor[1]})`,
+                          }}
+                        >
+                          {/* No energy value displayed in nuclear tab */}
+                        </div>
+
+                        <div className="w-16 h-64 border border-gray-200 rounded bg-gray-50 relative overflow-hidden">
+                          <div
+                            className="absolute bottom-0 left-0 right-0"
+                            style={{
+                              background: `linear-gradient(to top, ${shellColor[0]}, ${shellColor[1]})`,
+                              height: `${heightPercentage}%`,
+                            }}
+                          ></div>
+                        </div>
+                        <div className="text-sm font-medium mt-2">{detail.shellName}</div>
+                      </div>
+                    );
+                  }),
+                  ...nuclearDetails.slice(-2).map((detail, idx) => {
+                    const nuclearEnergy = detail.energy;
+                    const particleColor = detail.type === 'proton' ? "#666666" : "#000000";
+                    const heightPercentage = getEnergyMeterHeight(nuclearEnergy);
+
+                    return (
+                      <div key={`nuclear-${idx}`} className="flex flex-col items-center">
+                        <div
+                          className="mb-2 px-2 py-1 rounded border border-gray-200 min-w-16 text-center"
+                          style={{ backgroundColor: particleColor }}
+                        >
+                          {/* No energy value displayed */}
+                        </div>
+
+                        <div className="w-16 h-64 border border-gray-200 rounded bg-gray-50 relative overflow-hidden">
+                          <div
+                            className="absolute bottom-0 left-0 right-0"
+                            style={{
+                              backgroundColor: particleColor,
+                              height: `${heightPercentage}%`,
+                            }}
+                          ></div>
+                        </div>
+                        <div className="text-sm font-medium mt-2">{detail.type}</div>
+                      </div>
+                    );
+                  })
+                ]}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-center mt-5">
+          <button
+            className="px-4 py-2 bg-blue-500 text-white border-none rounded cursor-pointer"
+            onClick={resetSimulation}
+          >
+            Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Details section */}
+      <div className="mt-4 border border-gray-200 rounded-lg p-5 bg-gray-50">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2">
+          {activeTab === "chemical" && ionizationDetails.map((detail, idx) => {
+            const shellColor = shellColors[detail.shellName] || ["#9e9e9e", "#bdbdbd"];
+
+            return (
+              <div
+                key={`ie-${idx}`}
+                className="p-2 rounded bg-gray-100"
+                style={{ border: `2px solid ${shellColor[0]}` }}
+              >
+                <div
+                  className="font-medium text-sm mb-1"
+                  style={{ color: shellColor[0] }}
+                >
+                  {detail.shellName}
+                </div>
+                <div className="text-xs">
+                  Electron #{detail.removeNumber} from shell
+                </div>
+                <div className="text-xs mt-0.5 font-medium">
+                  {detail.energy} kJ/mol
+                </div>
+              </div>
+            );
+          })}
+
+          {activeTab === "nuclear" && [
+            ...ionizationDetails.map((detail, idx) => {
+              const shellColor = shellColors[detail.shellName] || ["#9e9e9e", "#bdbdbd"];
+
+              return (
+                <div
+                  key={`ie-${idx}`}
+                  className="p-2 rounded bg-gray-100"
+                  style={{ border: `2px solid ${shellColor[0]}` }}
+                >
+                  <div
+                    className="font-medium text-sm mb-1"
+                    style={{ color: shellColor[0] }}
+                  >
+                    {detail.shellName}
+                  </div>
+                  <div className="text-xs">
+                    Electron #{detail.removeNumber} from shell
+                  </div>
+                  {activeTab === "chemical" && (
+                    <div className="text-xs mt-0.5 font-medium">
+                      {detail.energy} kJ/mol
+                    </div>
+                  )}
+                </div>
+              );
+            }),
+            ...nuclearDetails.map((detail, idx) => {
+              const particleColor = detail.type === 'proton' ? "#666666" : "#000000";
+
+              return (
+                <div
+                  key={`nuclear-${idx}`}
+                  className="p-2 rounded bg-gray-100"
+                  style={{ border: `2px solid ${particleColor}` }}
+                >
+                  <div
+                    className="font-medium text-sm mb-1"
+                    style={{ color: particleColor }}
+                  >
+                    {detail.type} removal
+                  </div>
+                  <div className="text-xs">
+                    Result: {detail.resultingElement}-{detail.resultingMass}
+                  </div>
+                  {/* No energy value displayed in nuclear tab */}
+                </div>
+              );
+            })
+          ]}
+        </div>
+      </div>
+    </div>
+  );
+}
