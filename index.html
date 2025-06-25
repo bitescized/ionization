@@ -23,19 +23,21 @@
         /* Periodic Table Styles */
         .periodic-table-container {
             background: white;
-            padding: 20px;
+            padding: 25px;
             border-radius: 10px;
             border: 2px solid #e9ecef;
             margin-bottom: 20px;
-            overflow: auto;
+            overflow: visible;
             position: relative;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .table-controls {
             display: flex;
             justify-content: center;
             gap: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             align-items: center;
         }
 
@@ -69,9 +71,8 @@
             grid-template-rows: repeat(7, 1fr);
             gap: 1px;
             width: 100%;
-            min-width: 650px;
-            max-width: none;
-            margin: 0 auto;
+            max-width: 900px;
+            margin: 30px auto;
             font-size: 8px;
             aspect-ratio: 18/7;
             transform-origin: center;
@@ -110,7 +111,7 @@
             transition: all 0.3s ease;
             background: #f8f9fa;
             padding: 1px;
-            min-height: 35px;
+            min-height: 30px;
             position: relative;
             overflow: visible;
         }
@@ -156,7 +157,8 @@
         .element.available:hover {
             background: #e3f2fd !important;
             border-color: #2360A1 !important;
-            box-shadow: 0 8px 25px rgba(35, 96, 161, 0.6) !important;
+            box-shadow: 0 12px 35px rgba(35, 96, 161, 0.8) !important;
+            transform: scale(2.2);
         }
 
         .element.selected {
@@ -188,6 +190,7 @@
             transform: none !important;
             border-color: #ced4da !important;
             box-shadow: none !important;
+            z-index: auto !important;
         }
 
         .element.unavailable .element-symbol,
@@ -198,18 +201,18 @@
 
         .element-symbol {
             font-weight: bold;
-            font-size: 12px;
+            font-size: 10px;
             transition: all 0.3s ease;
         }
 
         .element-number {
-            font-size: 8px;
+            font-size: 6px;
             color: #666;
             transition: all 0.3s ease;
         }
 
         .element-name {
-            font-size: 8px;
+            font-size: 6px;
             color: #666;
             text-align: center;
             line-height: 1.1;
@@ -233,22 +236,39 @@
             box-shadow: none;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 1000px) {
             .periodic-table {
-                min-width: 700px;
-                font-size: 8px;
+                font-size: 7px;
+                margin: 20px auto;
+                max-width: 95%;
             }
             
             .element {
-                min-height: 40px;
+                min-height: 25px;
             }
             
             .element:hover {
-                transform: scale(1.6);
+                transform: scale(2.2);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .periodic-table {
+                font-size: 6px;
+                margin: 15px auto;
+                max-width: 98%;
+            }
+            
+            .element {
+                min-height: 22px;
+            }
+            
+            .element:hover {
+                transform: scale(2.0);
             }
             
             .element-symbol {
-                font-size: 10px;
+                font-size: 7px;
             }
             
             .element:hover .element-symbol {
@@ -1621,9 +1641,10 @@
                 style: {
                     fontFamily: "Poppins, sans-serif",
                     fontWeight: 400,
-                    padding: "20px",
+                    padding: "10px",
                     maxWidth: "1200px",
                     margin: "0 auto",
+                    overflow: "visible"
                 }
             }, [
                 React.createElement('h1', {
