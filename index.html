@@ -23,7 +23,7 @@
         /* Periodic Table Styles */
         .periodic-table-container {
             background: white;
-            padding: 50px;
+            padding: 60px;
             border-radius: 10px;
             border: 2px solid #e9ecef;
             margin-bottom: 20px;
@@ -41,7 +41,7 @@
             grid-template-rows: repeat(7, 1fr);
             gap: 1px;
             width: 100%;
-            max-width: 750px;
+            max-width: 700px;
             margin: 0 auto;
             font-size: 8px;
             aspect-ratio: 18/7;
@@ -66,12 +66,13 @@
 
         .element:hover {
             background: #e3f2fd;
-            transform: scale(2.2);
+            transform: scale(1.8);
             border-color: #2360A1;
             z-index: 200;
             position: relative;
             box-shadow: 0 12px 35px rgba(35, 96, 161, 0.6);
             border-width: 2px;
+            transform-origin: center;
         }
 
         .element:hover .element-symbol {
@@ -106,7 +107,7 @@
             background: #e3f2fd !important;
             border-color: #2360A1 !important;
             box-shadow: 0 12px 35px rgba(35, 96, 161, 0.8) !important;
-            transform: scale(2.2);
+            transform: scale(1.8);
         }
 
         .element.selected {
@@ -186,7 +187,7 @@
 
         @media (max-width: 1000px) {
             .periodic-table-container {
-                padding: 40px;
+                padding: 50px;
             }
             
             .periodic-table {
@@ -199,7 +200,7 @@
             }
             
             .element:hover {
-                transform: scale(2.2);
+                transform: scale(1.8);
             }
             
             .element:hover .element-symbol {
@@ -209,7 +210,7 @@
 
         @media (max-width: 768px) {
             .periodic-table-container {
-                padding: 35px;
+                padding: 45px;
             }
             
             .periodic-table {
@@ -222,7 +223,7 @@
             }
             
             .element:hover {
-                transform: scale(2.0);
+                transform: scale(1.6);
             }
             
             .element-symbol {
