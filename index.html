@@ -33,37 +33,7 @@
             box-sizing: border-box;
         }
 
-        .table-controls {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
-            align-items: center;
-        }
 
-        .zoom-btn {
-            background: #2360A1;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-
-        .zoom-btn:hover {
-            background: #1e5391;
-            transform: translateY(-1px);
-        }
-
-        .zoom-level {
-            font-weight: bold;
-            color: #495057;
-            min-width: 60px;
-            text-align: center;
-        }
 
         .periodic-table {
             display: grid;
@@ -71,32 +41,10 @@
             grid-template-rows: repeat(7, 1fr);
             gap: 1px;
             width: 100%;
-            max-width: 850px;
-            margin: 30px auto;
+            max-width: 900px;
+            margin: 40px auto;
             font-size: 8px;
             aspect-ratio: 18/7;
-            transform-origin: center;
-            transition: transform 0.3s ease;
-        }
-
-        .periodic-table.zoom-1 {
-            transform: scale(1);
-        }
-
-        .periodic-table.zoom-2 {
-            transform: scale(1.2);
-        }
-
-        .periodic-table.zoom-3 {
-            transform: scale(1.4);
-        }
-
-        .periodic-table.zoom-4 {
-            transform: scale(1.6);
-        }
-
-        .periodic-table.zoom-5 {
-            transform: scale(1.8);
         }
 
         .element {
@@ -118,7 +66,7 @@
 
         .element:hover {
             background: #e3f2fd;
-            transform: scale(2);
+            transform: scale(2.2);
             border-color: #2360A1;
             z-index: 200;
             position: relative;
@@ -127,7 +75,7 @@
         }
 
         .element:hover .element-symbol {
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 900;
             color: #1565c0;
         }
@@ -139,7 +87,7 @@
         }
 
         .element:hover .element-name {
-            font-size: 10px;
+            font-size: 9px;
             color: #1976d2;
             font-weight: 600;
             white-space: normal;
@@ -239,7 +187,7 @@
         @media (max-width: 1000px) {
             .periodic-table {
                 font-size: 7px;
-                margin: 20px auto;
+                margin: 30px auto;
                 max-width: 95%;
             }
             
@@ -250,12 +198,16 @@
             .element:hover {
                 transform: scale(2.2);
             }
+            
+            .element:hover .element-symbol {
+                font-size: 13px;
+            }
         }
 
         @media (max-width: 768px) {
             .periodic-table {
                 font-size: 6px;
-                margin: 15px auto;
+                margin: 25px auto;
                 max-width: 98%;
             }
             
@@ -272,7 +224,7 @@
             }
             
             .element:hover .element-symbol {
-                font-size: 12px;
+                font-size: 11px;
             }
         }
     </style>
@@ -310,9 +262,6 @@
             // Wiggling mechanics
             const [mouseHistory, setMouseHistory] = useState([]);
             const [wiggleEnergy, setWiggleEnergy] = useState(0);
-
-            // Periodic table state
-            const [currentZoomLevel, setCurrentZoomLevel] = useState(1);
 
             // Canvas ref for electron animation
             const canvasRef = useRef(null);
@@ -863,14 +812,6 @@
                 }
 
                 return elements_list;
-            };
-
-            const zoomTable = (direction) => {
-                if (direction > 0 && currentZoomLevel < 5) {
-                    setCurrentZoomLevel(currentZoomLevel + 1);
-                } else if (direction < 0 && currentZoomLevel > 1) {
-                    setCurrentZoomLevel(currentZoomLevel - 1);
-                }
             };
 
             // Reset simulation
@@ -1629,14 +1570,6 @@
                 return React.createElement('div', null, 'Loading...');
             }
 
-            const zoomPercentages = {
-                1: "100%",
-                2: "120%",
-                3: "140%",
-                4: "160%",
-                5: "180%",
-            };
-
             return React.createElement('div', {
                 style: {
                     fontFamily: "Poppins, sans-serif",
@@ -1720,31 +1653,12 @@
                         style: { fontSize: "18px", fontWeight: 600, marginBottom: "15px", textAlign: "center" }
                     }, 'Select an Element from the Periodic Table'),
                     React.createElement('div', {
-                        key: 'table-controls',
-                        className: 'table-controls'
-                    }, [
-                        React.createElement('button', {
-                            key: 'zoom-out',
-                            className: 'zoom-btn',
-                            onClick: () => zoomTable(-1)
-                        }, '🔍➖'),
-                        React.createElement('span', {
-                            key: 'zoom-display',
-                            className: 'zoom-level'
-                        }, zoomPercentages[currentZoomLevel]),
-                        React.createElement('button', {
-                            key: 'zoom-in',
-                            className: 'zoom-btn',
-                            onClick: () => zoomTable(1)
-                        }, '🔍➕'),
-                        React.createElement('span', {
-                            key: 'help-text',
-                            style: { marginLeft: "15px", color: "#666", fontSize: "0.9em" }
-                        }, "Yellow = Available • Gray = Not Available • Green = Selected")
-                    ]),
+                        key: 'help-text',
+                        style: { textAlign: "center", marginBottom: "15px", color: "#666", fontSize: "0.9em" }
+                    }, "Yellow = Available • Gray = Not Available • Green = Selected"),
                     React.createElement('div', {
                         key: 'table',
-                        className: `periodic-table zoom-${currentZoomLevel}`,
+                        className: 'periodic-table',
                         style: { overflow: 'hidden' }
                     }, createPeriodicTable())
                 ]),
